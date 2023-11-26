@@ -2,6 +2,7 @@ import { app } from 'electron'
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
+
 const ffmpeg = require('fluent-ffmpeg');
 const wordsCount = require('words-count').default;
 import { FileData, EdgeTTSConfig, MetadataConfig } from "../../global/types";
@@ -9,6 +10,10 @@ import convertTextToSpeech from "./edge";
 const sharp = require('sharp');
 const { exec } = require('child_process');
 import { clearDirectory, wss, createDirIfNeeded, handleWebSocketError } from "./utils";
+
+// Disable this to use local ffmpeg binaries
+const ffmpegBin = require('ffmpeg-static-electron');
+process.env.FFMPEG_PATH = ffmpegBin.path
 
 // Set up directories
 const USER_DATA_PATH = app.getPath('userData');
