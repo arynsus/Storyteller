@@ -14,7 +14,6 @@ import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownloa
 // ├─┬ dist
 // │ └── index.html    > Electron-Renderer
 //
-process.env.VITE_DEV_SERVER_URL = ''
 process.env.DIST_ELECTRON = join(__dirname, '..')
 process.env.DIST = join(process.env.DIST_ELECTRON, '../dist')
 process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
@@ -147,7 +146,7 @@ const menu = Menu.buildFromTemplate(
                 {
                     label: 'Github Repo',
                     click: async () => {
-                        await shell.openExternal('https://electronjs.org')
+                        await shell.openExternal('https://github.com/arynsus/Storyteller')
                     }
                 }
             ]
