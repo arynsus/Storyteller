@@ -20,7 +20,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
+    "build:win": "vite build && electron-builder",
+    "build:mac": "vite build && electron-builder --mac",
     "build:vite": "vite build",
     "preview": "vite preview"
   },
