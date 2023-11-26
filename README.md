@@ -47,10 +47,6 @@ IMPORTANT NOTE: This application is intended for progamming-learning only, and n
 <!-- GETTING STARTED -->
 ## Getting Started
 
-### Prerequisites
-
-You need to have [ffmpeg](https://ffmpeg.org/) installed on your system.
-
 ### Installation
 
 Download the released version from [releases page](https://github.com/arynsus/Storyteller/releases) and install.
