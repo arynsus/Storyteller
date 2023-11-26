@@ -11,9 +11,11 @@ const sharp = require('sharp');
 const { exec } = require('child_process');
 import { clearDirectory, wss, createDirIfNeeded, handleWebSocketError } from "./utils";
 
-// Disable this to use local ffmpeg binaries
+// Disable this to use local ffmpeg and ffprobe binaries
 const ffmpegBin = require('ffmpeg-static-electron');
 process.env.FFMPEG_PATH = ffmpegBin.path
+const ffprobeBin = require('ffprobe-static-electron');
+process.env.FFPROBE_PATH = ffprobeBin.path
 
 // Set up directories
 const USER_DATA_PATH = app.getPath('userData');
