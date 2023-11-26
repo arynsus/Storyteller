@@ -68,6 +68,16 @@ cd Storyteller
 # Install dependencies
 npm install
 
+# Update FFMPEG and FFPROBE binaries
+# Windows x64:
+copy .\ffmpeg-bin\ffmpeg\win\x64\ffmpeg.exe .\node_modules\ffmpeg-static-electron\bin\win\x64\
+copy .\ffmpeg-bin\ffprobe\win\x64\ffprobe.exe .\node_modules\ffprobe-static-electron\bin\win\x64\
+# macOS:
+cp ./ffmpeg-bin/ffmpeg/mac/arm64/ffmpeg ./node_modules/ffmpeg-static-electron/bin/mac/arm64/
+cp ./ffmpeg-bin/ffprobe/mac/arm64/ffprobe ./node_modules/ffprobe-static-electron/bin/mac/arm64/
+chmod +x ./node_modules/ffmpeg-static-electron/bin/mac/arm64/
+chmod +x ./node_modules/ffprobe-static-electron/bin/mac/arm64/
+
 # Run in development mode
 npm run dev
 
