@@ -10,9 +10,9 @@
                     </div>
                 </template>
                 <template #columns>
-                    <a-table-column title="Filename" data-index="filename"></a-table-column>
+                    <a-table-column title="Filename" :ellipsis="true" data-index="filename"> </a-table-column>
                     <a-table-column title="Word Count" data-index="wordcount" :width="120"></a-table-column>
-                    <a-table-column title="Progress" :width="300">
+                    <a-table-column title="Progress" :width="240">
                         <template #cell="{ record }">
                             <Progress :percent="calculateProgress(record)" :status="getProgressBarStatus(record)">
                                 <template v-slot:text>

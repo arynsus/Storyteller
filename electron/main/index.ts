@@ -156,10 +156,10 @@ const menu = Menu.buildFromTemplate(
 async function createWindow() {
     win = new BrowserWindow({
         title: 'Storyteller',
-        width: 1640,
-        height: 900,
-        minWidth: 1640,
-        minHeight: 900,
+        width: 1280,
+        height: 720,
+        minWidth: 1280,
+        minHeight: 720,
         icon: join(process.env.VITE_PUBLIC, 'favicon.png'),
         webPreferences: {
             preload,
