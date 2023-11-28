@@ -1,26 +1,26 @@
 <template>
-    <a-card title="TTS Settings">
+    <a-card :title="t('TTSCONFIG_CardTitle')">
         <div class="flex flex-col gap-1">
             <div id="voice">
-                <p class="form-label">Voice</p>
+                <p class="form-label">{{ t('TTSCONFIG_FormLabelVoice') }}</p>
                 <a-select v-model="edgeTTSConfigStore.config.voice" default-value="zh-CN-XiaoxiaoNeural">
                     <a-option v-for="voice in voices">{{ voice }}</a-option>
                 </a-select>
             </div>
             <div id="form-pitch" class="mt-3">
-                <p class="form-label">Pitch (%)</p>
+                <p class="form-label">{{ t('TTSCONFIG_FormLabelPitch') }}</p>
                 <a-slider class="grow pl-0.5" :min="-50" :max="50" show-input :show-tooltip="false" v-model="edgeTTSConfigStore.config.pitch" />
             </div>
             <div id="form-speed">
-                <p class="form-label">Speed (%)</p>
+                <p class="form-label">{{ t('TTSCONFIG_FormLabelSpeed') }}</p>
                 <a-slider class="grow pl-0.5" :min="-50" :max="50" show-input :show-tooltip="false" v-model="edgeTTSConfigStore.config.speed" />
             </div>
             <div id="form-job-concurrency">
-                <p class="form-label">Concurrent jobs</p>
+                <p class="form-label">{{ t('TTSCONFIG_FormLabelConcurrentJobs') }}</p>
                 <a-slider class="grow pl-0.5" :min="1" :max="20" show-input :show-tooltip="false" v-model="edgeTTSConfigStore.config.jobConcurrencyLimit" />
             </div>
             <div id="form-section-concurrency">
-                <p class="form-label">Concurrent sections</p>
+                <p class="form-label">{{ t('TTSCONFIG_FormLabelConcurrentSections') }}</p>
                 <a-slider class="grow pl-0.5" :min="1" :max="20" show-input :show-tooltip="false" v-model="edgeTTSConfigStore.config.sectionConcurrencyLimit" />
             </div>
         </div>
@@ -29,7 +29,10 @@
   
 <script setup lang="ts">
 import { useEdgeTTSConfigStore } from '../store';
+import { useI18n } from 'vue-i18n';
 
+// Inside your setup function
+const { t } = useI18n();
 const edgeTTSConfigStore = useEdgeTTSConfigStore();
 
 const voices = [
@@ -71,6 +74,10 @@ const voices = [
     "en-GB-RyanNeural",
     "en-GB-SoniaNeural",
     "en-GB-ThomasNeural",
+
+    // Peninsula Spanish
+    "es-ES-AlvaroNeural",
+    "es-ES-ElviraNeural"
 ]
 
 </script>

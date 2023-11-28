@@ -10,41 +10,41 @@
                     </div>
                 </template>
                 <template #columns>
-                    <a-table-column title="Filename" :ellipsis="true" data-index="filename"> </a-table-column>
-                    <a-table-column title="Word Count" data-index="wordcount" :width="120"></a-table-column>
-                    <a-table-column title="Progress" :width="240">
+                    <a-table-column :title=" t('FILELIST_TableHeaderFilename') " :ellipsis="true" data-index="filename"> </a-table-column>
+                    <a-table-column :title=" t('FILELIST_TableHeaderWordCount') " data-index="wordcount" :width="120"></a-table-column>
+                    <a-table-column :title=" t('FILELIST_TableHeaderProgress') " :width="240">
                         <template #cell="{ record }">
                             <Progress :percent="calculateProgress(record)" :status="getProgressBarStatus(record)">
                                 <template v-slot:text>
                                     <div v-if="record.errors.length > 0">
-                                        Error
+                                        {{ t('FILELIST_ProgressStatusError') }}
                                     </div>
                                     <div v-else-if="record.warnings.length > 0">
-                                        Warning
+                                        {{ t('FILELIST_ProgressStatusWarning') }}
                                     </div>
                                     <div v-else-if="record.converting">
-                                        Converting {{ record.finishedSections + 1 }} / {{ record.totalSections }}
+                                        {{ t('FILELIST_ProgressStatusConverting') }} {{ record.finishedSections + 1 }} / {{ record.totalSections }}
                                     </div>
                                     <div v-else-if="record.inQueue">
-                                        In Queue
+                                        {{ t('FILELIST_ProgressStatusInQueue') }}
                                     </div>
                                     <div v-else-if="record.splitting">
-                                        Splitting
+                                        {{ t('FILELIST_ProgressStatusSplitting') }}
                                     </div>
                                     <div v-else-if="record.combining">
-                                        Combining
+                                        {{ t('FILELIST_ProgressStatusCombining') }}
                                     </div>
                                     <div v-else-if="record.finished">
-                                        Finished
+                                        {{ t('FILELIST_ProgressStatusFinished') }}
                                     </div>
                                     <div v-else>
-                                        Ready
+                                        {{ t('FILELIST_ProgressStatusReady') }}
                                     </div>
                                 </template>
                             </Progress>
                         </template>
                     </a-table-column>
-                    <a-table-column title="Actions" :width="80">
+                    <a-table-column :title=" t('FILELIST_TableHeaderActions') " :width="80">
                         <template #cell="{ record }">
                             <a-button v-if="!record.finished" :disabled="!record.readyToStart" type="primary" shape="round" status="danger" @click="() => removeFile(record)">
                                 <template #icon>
@@ -72,6 +72,10 @@ import { TableData, Message, Progress, Button as AButton } from '@arco-design/we
 import { ipcRenderer } from 'electron';
 import { useFileListStore } from '../store';
 import { FileData } from "../../global/types";
+import { useI18n } from 'vue-i18n';
+
+// Inside your setup function
+const { t } = useI18n();
 
 const fileListStore = useFileListStore();
 
@@ -106,7 +110,7 @@ onMounted(() => {
         if (res.type == "error" && !res.filename) {
             return Message.error({
                 id: crypto.randomUUID(),
-                content: `System malfunction: ${res.error}`,
+                content: `${t('MESSAGE_SystemMalfunction')} ${res.error}`,
                 duration: 5000,
                 position: 'bottom'
             })
@@ -138,7 +142,7 @@ onMounted(() => {
                     updateData.warnings = entryToModify.warnings ? [...entryToModify.warnings, 'cover-art-unavailable'] : ['cover-art-unavailable'];
                     Message.warning({
                         id: crypto.randomUUID(),
-                        content: `Cover art for ${entryToModify.filename} is unavailable. Skipped artwork.`,
+                        content: `${t("MESSAGE_CoverArtUnavailableBeforeFilename")}${entryToModify.filename}${t("MESSAGE_CoverArtUnavailableAfterFilename")}`,
                         duration: 2000,
                         position: 'bottom'
                     });
@@ -149,7 +153,7 @@ onMounted(() => {
                     updateData.finishedSections = 0;
                     Message.error({
                         id: crypto.randomUUID(),
-                        content: `Error converting file: ${res.error}`,
+                        content: `${t("MESSAGE_ConversionFailureBeforeFilename")}${res.error}${t("MESSAGE_ConversionFailureBeforeFilename")}`,
                         duration: 5000,
                         position: 'bottom'
                     })
@@ -209,14 +213,14 @@ ipcRenderer.on('file-downloaded', (event, res) => {
     if (res.success) {
         Message.success({
             id: crypto.randomUUID(),
-            content: `${res.filename} downloaded.`,
+            content: `${t("MESSAGE_DownloadFileSuccessBeforeFilename")}${res.filename}${t("MESSAGE_DownloadFileSuccessAfterFilename")}`,
             duration: 2000,
             position: 'bottom'
         })
     } else {
         Message.error({
             id: crypto.randomUUID(),
-            content: `${res.err}.`,
+            content: `${t("MESSAGE_DownloadFileFailure")}${res.err}.`,
             duration: 2000,
             position: 'bottom'
         })

@@ -1,7 +1,7 @@
 <template>
     <div class="dropzone w-full h-24 flex flex-col gap-1 justify-center items-center shrink-0" @drop.prevent="handleDrop" @dragover.prevent @click="triggerFileInput">
-        <p>Drag in .txt files to start or click to select files.</p>
-        <p>One chapter per .txt recommended.</p>
+        <p>{{ t('DROPZONE_dragInFilesIndicator') }}</p>
+        <p>{{ t('DROPZONE_dragInFilesSuggestion') }}</p>
         <input type="file" ref="fileInput" @change="handleFileInput" multiple style="display: none;" accept=".txt">
     </div>
 </template>
@@ -12,7 +12,10 @@ import { ref } from 'vue';
 import { useFileListStore } from '../store';
 import { FileDataClass } from "../../global/types";
 import { analyzeMetadata } from "../../global/metadataAnalyzer";
+import { useI18n } from 'vue-i18n';
 
+// Inside your setup function
+const { t } = useI18n();
 const fileListStore = useFileListStore();
 
 const fileInput = ref<HTMLInputElement>();

@@ -1,9 +1,9 @@
 import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions } from 'electron'
 import { release } from 'node:os'
-import { join } from 'node:path'
+import path from 'node:path'
 import { handleFileConversion, AUDIO_OUTPUT_DIR } from "./tts";
 import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownload, clearDirectory } from "./utils";
-
+import locales from '../locales'
 // The built directory structure
 //
 // ├─┬ dist-electron
@@ -14,11 +14,13 @@ import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownloa
 // ├─┬ dist
 // │ └── index.html    > Electron-Renderer
 //
-process.env.DIST_ELECTRON = join(__dirname, '..')
-process.env.DIST = join(process.env.DIST_ELECTRON, '../dist')
+process.env.DIST_ELECTRON = path.join(__dirname, '..')
+process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist')
 process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
-    ? join(process.env.DIST_ELECTRON, '../public')
+    ? path.join(process.env.DIST_ELECTRON, '../public')
     : process.env.DIST
+process.env.LANGUAGE = 'es'
+
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith('6.1')) app.disableHardwareAcceleration()
@@ -38,120 +40,172 @@ if (!app.requestSingleInstanceLock()) {
 
 let win: BrowserWindow | null = null
 // Here, you can also use other preload
-const preload = join(__dirname, '../preload/index.js')
+const preload = path.join(__dirname, '../preload/index.js')
 const url = process.env.VITE_DEV_SERVER_URL
-const indexHtml = join(process.env.DIST, 'index.html')
+const indexHtml = path.join(process.env.DIST, 'index.html')
 const isMac = process.platform === 'darwin'
 
-const menu = Menu.buildFromTemplate(
-    [
+app.on("ready", ()=>{
+    const systemLanguage = app.getLocale();
+    changeLanguage(systemLanguage.slice(0,2))
+})
+
+async function changeLanguage(language) {
+    // Update the process.env.LANGUAGE
+    process.env.LANGUAGE = language;
+
+    // Load the new language translations
+    const locale = locales[language];
+
+    // Rebuild the menu with the new language
+    const menuTemplate = getMenuTemplate(locale);
+    const menu = Menu.buildFromTemplate(menuTemplate);
+    if (win) {
+        win.setMenu(menu)
+    }
+
+    // Notify all renderer windows about the language change
+    const allWindows = BrowserWindow.getAllWindows();
+    allWindows.forEach(window => {
+        window.webContents.send("change-language", language);
+    })
+}
+
+function getMenuTemplate(locale) {
+    // Build your menu template here using the 'locale' object
+    // For example:
+    return [
         // { role: 'appMenu' }
         ...(isMac ? [{
             label: app.name,
             submenu: [
-                { role: 'about' },
+                { role: 'about', label: locale.About },
                 { type: 'separator' },
-                { role: 'services' },
+                { role: 'services', label: locale.Services },
                 { type: 'separator' },
-                { role: 'hide' },
-                { role: 'hideothers' },
-                { role: 'unhide' },
+                { role: 'hide', label: locale.Hide },
+                { role: 'hideothers', label: locale.Hideothers },
+                { role: 'unhide', label: locale.Unhide },
                 { type: 'separator' },
-                { role: 'quit' }
+                { role: 'quit', label: locale.Quit }
             ]
         }] : []) as MenuItemConstructorOptions[],
         // { role: 'fileMenu' }
         {
-            label: 'File',
+            label: locale.File,
             submenu: [
                 {
-                    label: 'Clear output cache',
+                    label: locale.ClearOutputCache,
                     click: () => {
                         const removed = clearDirectory(AUDIO_OUTPUT_DIR);
                         win.webContents.send("output-cache-cleared", removed.length)
                     }
                 },
                 { type: 'separator' },
-                isMac ? { role: 'close' } : { role: 'quit' }
+                isMac ? { role: 'close', label: locale.Close } : { role: 'quit', label: locale.Quit }
             ] as MenuItemConstructorOptions[]
         },
         // { role: 'editMenu' }
         {
-            label: 'Edit',
+            label: locale.Edit,
             submenu: [
-                { role: 'undo' },
-                { role: 'redo' },
+                { role: 'undo', label: locale.Undo },
+                { role: 'redo', label: locale.Redo },
                 { type: 'separator' },
-                { role: 'cut' },
-                { role: 'copy' },
-                { role: 'paste' },
+                { role: 'cut', label: locale.Cut },
+                { role: 'copy', label: locale.Copy },
+                { role: 'paste', label: locale.Paste },
                 ...(isMac ? [
-                    { role: 'pasteAndMatchStyle' },
-                    { role: 'delete' },
-                    { role: 'selectAll' },
+                    { role: 'pasteAndMatchStyle', label: locale.PasteAndMatchStyle },
+                    { role: 'delete', label: locale.Delete },
+                    { role: 'selectAll', label: locale.SelectAll },
                     { type: 'separator' },
                     {
-                        label: 'Speech',
+                        label: locale.Speech,
                         submenu: [
-                            { role: 'startSpeaking' },
-                            { role: 'stopSpeaking' }
+                            { role: 'startSpeaking', label: locale.StartSpeaking },
+                            { role: 'stopSpeaking', label: locale.StopSpeaking }
                         ]
                     }
                 ] : [
-                    { role: 'delete' },
+                    { role: 'delete', label: locale.Delete },
                     { type: 'separator' },
-                    { role: 'selectAll' }
-                ]) as MenuItemConstructorOptions[]
-            ]
+                    { role: 'selectAll', label: locale.SelectAll }
+                ])
+            ] as MenuItemConstructorOptions[]
         },
         // { role: 'viewMenu' }
         {
-            label: 'View',
+            label: locale.View,
             submenu: [
-                { role: 'reload' },
-                { role: 'forceReload' },
-                { role: 'toggleDevTools' },
+                { role: 'reload', label: locale.Reload },
+                { role: 'forceReload', label: locale.ForceReload },
+                { role: 'toggleDevTools', label: locale.ToggleDevTools },
                 { type: 'separator' },
-                { role: 'resetZoom' },
-                { role: 'zoomIn' },
-                { role: 'zoomOut' },
+                { role: 'resetZoom', label: locale.ResetZoom },
+                { role: 'zoomIn', label: locale.ZoomIn },
+                { role: 'zoomOut', label: locale.ZoomOut },
                 { type: 'separator' },
-                { role: 'togglefullscreen' }
-            ]
+                { role: 'togglefullscreen', label: locale.Togglefullscreen }
+            ] as MenuItemConstructorOptions[]
         },
         // { role: 'windowMenu' }
         {
-            label: 'Window',
+            label: locale.Window,
             submenu: [
                 {
-                    label: 'Chapter Maker',
+                    label: locale.ChapterMaker,
                     click: () => createChapterMakerWindow(),
                 },
                 { type: 'separator' },
-                { role: 'minimize' },
-                { role: 'zoom' },
+                { role: 'minimize', label: locale.Minimize },
+                { role: 'zoom', label: locale.Zoom },
                 ...(isMac ? [
                     { type: 'separator' },
-                    { role: 'front' },
+                    { role: 'front', label: locale.Front },
                     { type: 'separator' },
-                    { role: 'window' }
+                    { role: 'window', label: locale.Window }
                 ] : [
-                    { role: 'close' }
-                ]) as MenuItemConstructorOptions[]
-            ]
+                    { role: 'close', label: locale.Close }
+                ])
+            ] as MenuItemConstructorOptions[]
         },
         {
-            role: 'help',
+            label: locale.Help,
             submenu: [
                 {
-                    label: 'Github Repo',
+                    label: locale.GithubRepo,
                     click: async () => {
                         await shell.openExternal('https://github.com/arynsus/Storyteller')
                     }
                 }
-            ]
+            ] as MenuItemConstructorOptions[]
+        },
+        {
+            label: locale.Language,
+            submenu: [
+                {
+                    label: 'English',
+                    click: async () => {
+                        await changeLanguage("en")
+                    }
+                },
+                {
+                    label: '简体中文',
+                    click: async () => {
+                        await changeLanguage("zh")
+                    }
+                },
+                {
+                    label: 'Español',
+                    click: async () => {
+                        await changeLanguage("es")
+                    }
+                }
+            ] as MenuItemConstructorOptions[]
         }
-    ])
+    ];
+}
 
 async function createWindow() {
     win = new BrowserWindow({
@@ -160,7 +214,7 @@ async function createWindow() {
         height: 720,
         minWidth: 1280,
         minHeight: 720,
-        icon: join(process.env.VITE_PUBLIC, 'favicon.png'),
+        icon: path.join(process.env.VITE_PUBLIC, 'favicon.png'),
         webPreferences: {
             preload,
             // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
@@ -171,7 +225,7 @@ async function createWindow() {
         },
     })
 
-    win.setMenu(menu);
+    changeLanguage(process.env.LANGUAGE)
 
     if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
         win.loadURL(url)
@@ -258,7 +312,8 @@ function createChapterMakerWindow() {
 
     if (process.env.VITE_DEV_SERVER_URL) {
         // Load Vue component via URL for development
-        chapterMakerWindow.loadURL(`${url}chapter-maker`);
+        chapterMakerWindow.loadURL(`${url}#chapter-maker`);
+        chapterMakerWindow.webContents.openDevTools()
     } else {
         // Load Vue component via file for production
         chapterMakerWindow.loadFile(indexHtml, { hash: 'chapter-maker' });

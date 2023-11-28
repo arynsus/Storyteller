@@ -98,6 +98,10 @@ npm run build
 <!-- ROADMAP -->
 ## Roadmap
 
+- [x] Add Multi-language support.
+  - [x] English
+  - [x] Chinese
+  - [x] Spanish
 - [ ] Auto-testing of Edge TTS Voice availability.
 - [ ] Add other TTS options
 

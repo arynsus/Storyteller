@@ -13,8 +13,8 @@
                 <TTSConfigComponent />
                 <MetadataConfigComponent />
                 <div class="flex gap-2 justify-end">
-                    <a-button :disabled="!fileListStore.files || fileListStore.files.length == 0" @click="clearList">Clear</a-button>
-                    <a-button type="primary" :disabled="!fileListStore.files || fileListStore.files.filter(file => file.readyToStart).length == 0" @click="convertFiles">Convert</a-button>
+                    <a-button :disabled="!fileListStore.files || fileListStore.files.length == 0" @click="clearList">{{ t('MAINWINDOW_ButtonClear') }}</a-button>
+                    <a-button type="primary" :disabled="!fileListStore.files || fileListStore.files.filter(file => file.readyToStart).length == 0" @click="convertFiles">{{ t('MAINWINDOW_ButtonCovert') }}</a-button>
                 </div>
             </div>
         </a-scrollbar>
@@ -31,7 +31,10 @@ import { Message } from '@arco-design/web-vue';
 import { ipcRenderer } from "electron";
 import { useEdgeTTSConfigStore, useFileListStore } from '../store';
 import { FileData } from "../../global/types";
+import { useI18n } from 'vue-i18n';
 
+// Inside your setup function
+const { t } = useI18n();
 const edgeTTSConfigStore = useEdgeTTSConfigStore();
 const fileListStore = useFileListStore();
 
@@ -40,14 +43,6 @@ const clearList = () => {
     fileListStore.clearList()
 }
 const convertFiles = () => {
-    if (!fileListStore.files || fileListStore.files.filter(file => !file.url).length == 0) {
-        return Message.warning({
-            id: crypto.randomUUID(),
-            content: `There is nothing to convert --!`,
-            duration: 2000,
-            position: 'bottom'
-        })
-    }
     const filesToQueue = fileListStore.files.filter(file => file.readyToStart)
     const files = JSON.parse(JSON.stringify(filesToQueue));
     const config = JSON.parse(JSON.stringify(edgeTTSConfigStore.config));

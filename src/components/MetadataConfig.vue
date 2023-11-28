@@ -1,8 +1,8 @@
 <template>
-    <a-card title="Metadata Settings" class="grow">
+    <a-card :title="t('TTSCONFIG_CardTitle')" class="grow">
         <div class="flex flex-col gap-3">
             <div id="form-book-title">
-                <p class="form-label">Book Title</p>
+                <p class="form-label">{{ t('METADATACONFIG_FormLabelBookTitle') }}</p>
                 <div class="grow pl-0.5 flex gap-1">
                     <a-input :disabled="!selectedFile" v-model="formData.bookTitle" @change="confirmMetadataChange('bookTitle')" />
                     <a-tooltip content="Apply to all unconverted files.">
@@ -15,14 +15,14 @@
                 </div>
             </div>
             <div id="form-chapter">
-                <p class="form-label">Chapter No. & Title</p>
+                <p class="form-label">{{ t('METADATACONFIG_FormLabelChapterNoAndTitle') }}</p>
                 <div class="flex gap-1">
                     <a-input class="pl-0.5" :disabled="!selectedFile" style="width:55px" hide-button v-model="formData.chapterNumber" @change="confirmMetadataChange('chapterNumber')" />
                     <a-input class="grow" :disabled="!selectedFile" v-model="formData.chapterTitle" @change="confirmMetadataChange('chapterTitle')" />
                 </div>
             </div>
             <div id="form-author">
-                <p class="form-label">Author</p>
+                <p class="form-label">{{ t('METADATACONFIG_FormLabelAuthor') }}</p>
                 <div class="grow pl-0.5 flex gap-1">
                     <a-input :disabled="!selectedFile" v-model="formData.author" @change="confirmMetadataChange('author')" />
                     <a-tooltip content="Apply to all unconverted files.">
@@ -35,7 +35,7 @@
                 </div>
             </div>
             <div id="form-cover-art">
-                <p class="form-label">Cover Art</p>
+                <p class="form-label">{{ t('METADATACONFIG_FormLabelCoverArt') }}</p>
                 <div class="grow pl-0.5 flex gap-1">
                     <a-input :disabled="!selectedFile" v-model="formData.coverArt" @change="confirmMetadataChange('coverArt')" />
 
@@ -69,7 +69,10 @@
 import { ref, watch, onMounted, computed } from 'vue';
 import { useFileListStore } from '../store';
 import { MetadataConfig } from '../../global/types';
+import { useI18n } from 'vue-i18n';
 
+// Inside your setup function
+const { t } = useI18n();
 const fileListStore = useFileListStore();
 const formData = ref<MetadataConfig>({
     bookTitle: '',
