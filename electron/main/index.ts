@@ -3,7 +3,9 @@ import { release } from 'node:os'
 import path from 'node:path'
 import { handleFileConversion, AUDIO_OUTPUT_DIR } from "./tts";
 import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownload, clearDirectory } from "./utils";
+import { testVoiceAvailability } from "./edge";
 import locales from '../locales'
+
 // The built directory structure
 //
 // ├─┬ dist-electron
@@ -19,7 +21,7 @@ process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist')
 process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
     ? path.join(process.env.DIST_ELECTRON, '../public')
     : process.env.DIST
-process.env.LANGUAGE = 'es'
+process.env.LANGUAGE = "en"
 
 
 // Disable GPU Acceleration for Windows 7
@@ -45,30 +47,27 @@ const url = process.env.VITE_DEV_SERVER_URL
 const indexHtml = path.join(process.env.DIST, 'index.html')
 const isMac = process.platform === 'darwin'
 
-app.on("ready", ()=>{
-    const systemLanguage = app.getLocale();
-    changeLanguage(systemLanguage.slice(0,2))
-})
-
 async function changeLanguage(language) {
-    // Update the process.env.LANGUAGE
-    process.env.LANGUAGE = language;
+    if (process.env.LANGUAGE != language) {
+        // Update the process.env.LANGUAGE
+        process.env.LANGUAGE = language;
 
-    // Load the new language translations
-    const locale = locales[language];
+        // Load the new language translations
+        const locale = locales[language];
 
-    // Rebuild the menu with the new language
-    const menuTemplate = getMenuTemplate(locale);
-    const menu = Menu.buildFromTemplate(menuTemplate);
-    if (win) {
-        win.setMenu(menu)
+        // Rebuild the menu with the new language
+        const menuTemplate = getMenuTemplate(locale);
+        const menu = Menu.buildFromTemplate(menuTemplate);
+        if (win) {
+            win.setMenu(menu)
+        }
+
+        // Notify all renderer windows about the language change
+        const allWindows = BrowserWindow.getAllWindows();
+        allWindows.forEach(window => {
+            window.webContents.send("change-language", language);
+        })
     }
-
-    // Notify all renderer windows about the language change
-    const allWindows = BrowserWindow.getAllWindows();
-    allWindows.forEach(window => {
-        window.webContents.send("change-language", language);
-    })
 }
 
 function getMenuTemplate(locale) {
@@ -157,6 +156,10 @@ function getMenuTemplate(locale) {
                     label: locale.ChapterMaker,
                     click: () => createChapterMakerWindow(),
                 },
+                {
+                    label: locale.VoiceTester,
+                    click: () => createVoiceTesterWindow(),
+                },
                 { type: 'separator' },
                 { role: 'minimize', label: locale.Minimize },
                 { role: 'zoom', label: locale.Zoom },
@@ -207,7 +210,7 @@ function getMenuTemplate(locale) {
     ];
 }
 
-async function createWindow() {
+async function createMainWindow() {
     win = new BrowserWindow({
         title: 'Storyteller',
         width: 1280,
@@ -225,7 +228,11 @@ async function createWindow() {
         },
     })
 
-    changeLanguage(process.env.LANGUAGE)
+    const systemLanguage = app.getLocale();
+    process.env.LANGUAGE = systemLanguage.slice(0, 2)
+    const menuTemplate = getMenuTemplate(locales[process.env.LANGUAGE]);
+    const menu = Menu.buildFromTemplate(menuTemplate);
+    win.setMenu(menu)
 
     if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
         win.loadURL(url)
@@ -248,7 +255,55 @@ async function createWindow() {
     // win.webContents.on('will-navigate', (event, url) => { }) #344
 }
 
-app.whenReady().then(createWindow)
+async function createChapterMakerWindow() {
+    const chapterMakerWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        title: 'Chapter Maker',
+        webPreferences: {
+            preload,
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+
+    chapterMakerWindow.setMenu(null)
+
+    if (process.env.VITE_DEV_SERVER_URL) {
+        // Load Vue component via URL for development
+        chapterMakerWindow.loadURL(`${url}#chapter-maker`);
+        chapterMakerWindow.webContents.openDevTools()
+    } else {
+        // Load Vue component via file for production
+        chapterMakerWindow.loadFile(indexHtml, { hash: 'chapter-maker' });
+    }
+}
+
+async function createVoiceTesterWindow() {
+    const voiceTesterWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        title: 'Voice Tester',
+        webPreferences: {
+            preload,
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+
+    voiceTesterWindow.setMenu(null)
+
+    if (process.env.VITE_DEV_SERVER_URL) {
+        // Load Vue component via URL for development
+        voiceTesterWindow.loadURL(`${url}#voice-tester`);
+        voiceTesterWindow.webContents.openDevTools()
+    } else {
+        // Load Vue component via file for production
+        voiceTesterWindow.loadFile(indexHtml, { hash: 'voice-tester' });
+    }
+}
+
+app.whenReady().then(createMainWindow)
 
 app.on('window-all-closed', () => {
     win = null
@@ -268,7 +323,7 @@ app.on('activate', () => {
     if (allWindows.length) {
         allWindows[0].focus()
     } else {
-        createWindow()
+        createMainWindow()
     }
 })
 
@@ -295,27 +350,5 @@ ipcMain.on('load-audio', handleAudioLoad);
 ipcMain.on('download-file', handleFileDownload);
 ipcMain.on('make-chapters', handleMakeChapters);
 ipcMain.on('add-to-list', (event, files) => handleAddToList(event, files, win));
-
-function createChapterMakerWindow() {
-    const chapterMakerWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        title: 'Chapter Maker',
-        webPreferences: {
-            preload,
-            nodeIntegration: true,
-            contextIsolation: false,
-        },
-    });
-
-    chapterMakerWindow.setMenu(null)
-
-    if (process.env.VITE_DEV_SERVER_URL) {
-        // Load Vue component via URL for development
-        chapterMakerWindow.loadURL(`${url}#chapter-maker`);
-        chapterMakerWindow.webContents.openDevTools()
-    } else {
-        // Load Vue component via file for production
-        chapterMakerWindow.loadFile(indexHtml, { hash: 'chapter-maker' });
-    }
-}
+ipcMain.on('voice-test-start', testVoiceAvailability);
+ipcMain.on('change-language', (event, language) => changeLanguage(language));

@@ -102,7 +102,7 @@ npm run build
   - [x] English
   - [x] Chinese
   - [x] Spanish
-- [ ] Auto-testing of Edge TTS Voice availability.
+- [x] Auto-testing of Edge TTS Voice availability.
 - [ ] Add other TTS options
 
 See the [open issues](https://github.com/arynsus/Storyteller/issues) for a full list of proposed features (and known issues).

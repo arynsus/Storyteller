@@ -1,5 +1,7 @@
 import { randomBytes } from "crypto";
 import WebSocket from "ws";
+import fs from "fs";
+import { wss } from "./utils";
 
 interface Executor {
     resolve: (value: Buffer) => void;
@@ -17,7 +19,7 @@ class Service {
         this.handleMessage = this.handleMessage.bind(this);
         this.handleTextMessage = this.handleTextMessage.bind(this);
         this.handleBinaryMessage = this.handleBinaryMessage.bind(this);
-      }
+    }
 
     async connect(): Promise<WebSocket> {
         const connectionId = randomBytes(16).toString("hex").toLowerCase();
@@ -218,5 +220,50 @@ async function retry<T>(
     }
     throw new Error(errorMessage);
 }
+
+// Voice availability tester
+export const testVoiceAvailability = async () => {
+    const voices = JSON.parse(fs.readFileSync("./voices.json", "utf8"));
+    const totalVoices = voices.length;
+    let testedVoices = 0;
+
+    for (const voice of voices) {
+        console.log(`Testing voice ${voice}`);
+        let attempt = 0;
+        let success = false;
+
+        // Inform clients about the voice being tested and progress
+        const progressMessage = {
+            type: "voice-test-progress",
+            voice,
+            testedVoices,
+            totalVoices,
+        };
+        wss.clients.forEach(client => client.send(JSON.stringify(progressMessage)));
+
+        while (attempt < 3 && !success) {
+            try {
+                const textToConvert = `<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"><voice name="${voice}"><prosody rate="0%" pitch="0%">This is a test message, the content is irrelevant.</prosody></voice></speak>`;
+                await service.convert(textToConvert, "audio-24khz-48kbitrate-mono-mp3");
+                success = true;
+                wss.clients.forEach(client => client.send(JSON.stringify({ type: "voice-test-success", voice })));
+            } catch (error) {
+                attempt++;
+                if (error.includes("1007")) {
+                    attempt = 3;
+                } else if (attempt >= 3) {
+                    console.error(`Failed to convert voice ${voice} after 3 attempts, check Internet connection.`);
+                }
+            }
+        }
+        testedVoices++;
+    }
+    wss.clients.forEach(client => client.send(JSON.stringify({
+        type: "voice-test-end",
+        testedVoices,
+        totalVoices,
+    })));
+};
+
 
 export default convertTextToSpeech

@@ -27,6 +27,7 @@ const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 
+// Reset upon selected file change.
 watch(() => fileListStore.getSelected, (selectedFile, oldSelectedFile) => {
     if (audio.value) {
         audio.value.removeEventListener('timeupdate', updateProgress);
@@ -45,7 +46,8 @@ watch(() => fileListStore.getSelected, (selectedFile, oldSelectedFile) => {
     }
 });
 
-ipcRenderer.on('load-audio-reply', (event, { success, data }) => {
+// Listen for audio loaded event from electron
+ipcRenderer.on('audio-loaded', (event, { success, data }) => {
     if (success) {
         const audioBlob = new Blob([new Uint8Array(Buffer.from(data, 'base64'))], { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
@@ -54,6 +56,7 @@ ipcRenderer.on('load-audio-reply', (event, { success, data }) => {
     }
 });
 
+// Audio player basic functionalities
 const togglePlayPause = () => {
     if (audio.value.paused) {
         audio.value.play();
@@ -63,20 +66,16 @@ const togglePlayPause = () => {
         isPlaying.value = false;
     }
 };
-
 const updateProgress = () => {
     currentTime.value = audio.value.currentTime;
     duration.value = audio.value.duration;
 };
-
-
 const seekAudio = (value: number | [number, number]) => {
     // Check if value is a number
     if (typeof value === 'number') {
         audio.value.currentTime = value;
     }
 };
-
 const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);

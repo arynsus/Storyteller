@@ -2,6 +2,7 @@ export interface EdgeTTSConfig {
     voice: string,
     speed: number,
     pitch: number,
+    wordsPerSection: number,
     jobConcurrencyLimit: number,
     sectionConcurrencyLimit: number
 }
@@ -36,7 +37,6 @@ export interface FileData {
 
 export class FileDataClass implements FileData {
 
-    // Define properties from the interface
     key: string;
     filename: string;
     path: string;
@@ -61,7 +61,6 @@ export class FileDataClass implements FileData {
         wordcount?: number,
         metadata?: MetadataConfig
     ) {
-        // Initialize properties with the constructor arguments
         this.key = key;
         this.filename = filename;
         this.path = path;

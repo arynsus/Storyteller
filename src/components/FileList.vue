@@ -74,9 +74,7 @@ import { useFileListStore } from '../store';
 import { FileData } from "../../global/types";
 import { useI18n } from 'vue-i18n';
 
-// Inside your setup function
 const { t } = useI18n();
-
 const fileListStore = useFileListStore();
 
 // Table will activate scrollbar once reach maximum height possible to allocate.
@@ -102,7 +100,7 @@ const updateHeight = () => {
     }
 };
 
-// Receive websocket message from electron and display.
+// Receive websocket message from electron and display TTS conversion progress.
 onMounted(() => {
     const ws = new WebSocket('ws://localhost:8080');
     ws.onmessage = (event) => {
@@ -165,7 +163,7 @@ onMounted(() => {
 }
 );
 
-// Progress bar color scheme
+// Progress bar color scheme and percentage
 const getProgressBarStatus = (row: TableData) => {
     if (row.errors.length > 0) {
         return 'danger';
@@ -178,7 +176,6 @@ const getProgressBarStatus = (row: TableData) => {
     }
     return 'normal'; // Default color
 }
-
 const calculateProgress = (row: TableData) => {
     if (row.splitting) {
         return 0.05; // Fixed 5% for splitting
@@ -192,7 +189,6 @@ const calculateProgress = (row: TableData) => {
     }
     return 0; // Default to 0% if none of the conditions are met (e.g., readyToStart)
 }
-
 
 // Highlight specific file for preview or metadata editing
 const selectForPreview = (row: TableData) => {

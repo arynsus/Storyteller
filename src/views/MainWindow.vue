@@ -33,7 +33,6 @@ import { useEdgeTTSConfigStore, useFileListStore } from '../store';
 import { FileData } from "../../global/types";
 import { useI18n } from 'vue-i18n';
 
-// Inside your setup function
 const { t } = useI18n();
 const edgeTTSConfigStore = useEdgeTTSConfigStore();
 const fileListStore = useFileListStore();
@@ -52,12 +51,14 @@ const convertFiles = () => {
     })
 };
 
+// Receive split results from Chapter Maker for TTS conversion.
 ipcRenderer.on('add-to-list', (event, files: FileData[]) => {
     files.forEach(file => {
         fileListStore.addFile(file)
     })
 });
 
+// Inform output cache clearing result.
 ipcRenderer.on('output-cache-cleared', (event, removedNumber: number) => {
     Message.success({
         id: crypto.randomUUID(),

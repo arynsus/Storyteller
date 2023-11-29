@@ -1,6 +1,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import MainWindow from './views/MainWindow.vue'; 
 import ChapterMakerWindow from './views/ChapterMakerWindow.vue'; 
+import VoiceTesterWindow from './views/VoiceTesterWindow.vue'; 
+import { i18n } from './main';
 
 const routes = [
   {
@@ -8,7 +10,7 @@ const routes = [
     name: 'MainWindow',
     component: MainWindow,
     meta: {
-      title: 'Storyteller'
+      titleKey: "MAINWINDOW_Title"
     }
   },
   {
@@ -16,7 +18,15 @@ const routes = [
     name: 'ChapterMakerWindow',
     component: ChapterMakerWindow,
     meta: {
-      title: 'Chapter Maker'
+      titleKey: "CHAPTERMAKER_Title"
+    }
+  },
+  {
+    path: '/voice-tester',
+    name: 'VoiceTesterWindow',
+    component: VoiceTesterWindow,
+    meta: {
+      titleKey: "VOICETESTER_Title"
     }
   },
 ];
@@ -26,8 +36,10 @@ const router = createRouter({
   routes,
 });
 
+// Update title for each page(window)
 router.beforeEach((to, from, next) => {
-  document.title = to.meta.title as string || 'Storyteller';
+  const titleKey = to.meta.titleKey;
+  document.title = i18n.global.t(String(titleKey)) || 'Storyteller';
   next();
 });
 

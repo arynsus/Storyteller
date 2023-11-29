@@ -24,7 +24,7 @@ export const createDirIfNeeded = (dirPath) => {
     }
 };
 
-
+// Add results of Chapter Maker to TTS conversion list
 export const handleAddToList = async (event, files: FileData[], mainWindow: BrowserWindow) => {
     const readFilePromises = files.map(file => {
         return readFile(file.path, 'utf8')
@@ -34,7 +34,7 @@ export const handleAddToList = async (event, files: FileData[], mainWindow: Brow
             })
             .catch(err => {
                 console.error('Error reading file:', err);
-                return null; // Handle the error appropriately
+                return null;
             });
     });
 
@@ -44,9 +44,9 @@ export const handleAddToList = async (event, files: FileData[], mainWindow: Brow
     });
 }
 
-
+// Chapter Maker functionality
 export const handleMakeChapters = (event, content, pattern) => {
-    // Ensure the directory exists
+
     createDirIfNeeded(CHAPTER_TXT_DIR);
 
     // Split the content into lines
@@ -68,12 +68,12 @@ export const handleMakeChapters = (event, content, pattern) => {
             }
 
             currentChapter = line.trim();
-            currentChapterContent = '';
+            currentChapterContent = line + '\n';
         } else {
             currentChapterContent += line + '\n';
         }
 
-        // Process the last chapter after the loop
+        // Save to local cache
         if (index === lines.length - 1 && currentChapter) {
             const safeChapterName = currentChapter.replace(/[\/\\:*?"<>|]/g, '');
             const filePath = path.join(CHAPTER_TXT_DIR, `${safeChapterName}.txt`);
@@ -84,7 +84,6 @@ export const handleMakeChapters = (event, content, pattern) => {
 
     event.reply('chapters-made', chapterFiles);
 };
-
 
 export const clearDirectory = (dirPath) => {
     const removedFiles = []
@@ -105,19 +104,19 @@ export const clearDirectory = (dirPath) => {
 
 clearDirectory(CHAPTER_TXT_DIR)
 
-
-
+// Load audio for result preview
 export const handleAudioLoad = async (event, audioUrl: string): Promise<void> => {
     fs.readFile(audioUrl, (err: Error, data: Buffer | string) => {
         if (err) {
             handleWebSocketError(err)
-            event.reply('load-audio-reply', { success: false });
+            event.reply('audio-loaded', { success: false });
         } else {
-            event.reply('load-audio-reply', { success: true, data: data.toString('base64') });
+            event.reply('audio-loaded', { success: true, data: data.toString('base64') });
         }
     });
 }
 
+// Download files (copy files to system download folder)
 export const handleFileDownload = async (event, filePath: string): Promise<void> => {
     const filename = path.basename(filePath);
     const userDownloadFolder = app.getPath('downloads');
@@ -132,6 +131,7 @@ export const handleFileDownload = async (event, filePath: string): Promise<void>
     });
 }
 
+// Inform vue frontend of errors
 export const handleWebSocketError = (error: Error, filename?: string) => {
     wss.clients.forEach(client => client.send(JSON.stringify({ type: 'error', error: error.message, filename })));
 };

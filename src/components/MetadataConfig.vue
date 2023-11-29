@@ -1,5 +1,10 @@
 <template>
-    <a-card :title="t('TTSCONFIG_CardTitle')" class="grow">
+    <a-card :title="t('METADATACONFIG_CardTitle')" class="grow" id="metadata-config-card">
+
+        <template #extra>
+            <i v-if="cardIsOpen" class="fa-sharp fa-minus text-white"></i>
+            <i v-else class="fa-sharp fa-plus text-white"></i>
+        </template>
         <div class="flex flex-col gap-3">
             <div id="form-book-title">
                 <p class="form-label">{{ t('METADATACONFIG_FormLabelBookTitle') }}</p>
@@ -66,12 +71,11 @@
 </template>
   
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, watch, onMounted, computed, nextTick } from 'vue';
 import { useFileListStore } from '../store';
 import { MetadataConfig } from '../../global/types';
 import { useI18n } from 'vue-i18n';
 
-// Inside your setup function
 const { t } = useI18n();
 const fileListStore = useFileListStore();
 const formData = ref<MetadataConfig>({
@@ -82,10 +86,25 @@ const formData = ref<MetadataConfig>({
     coverArt: ''
 })
 
-// Replace selectedFile ref with a computed property
-const selectedFile = computed(() => fileListStore.getSelected);
+const cardIsOpen = ref(false)
+const toggleCardOpen = () => {
+    cardIsOpen.value = !cardIsOpen.value
+}
+
+// A *very* forced way to simulate card collapse for arco design.
+nextTick(() => {
+    const cardHeader = document.querySelector("#metadata-config-card .arco-card-header")
+    const cardBody = document.querySelector("#metadata-config-card .arco-card-body")
+    cardHeader.addEventListener('click', () => {
+        toggleCardOpen()
+        cardBody.classList.toggle("hidden")
+    })
+    cardHeader.classList.add("cursor-pointer")
+    cardBody.classList.add("hidden")
+})
 
 // Update formData when the selected file changes
+const selectedFile = computed(() => fileListStore.getSelected);
 watch(selectedFile, (newFile) => {
     if (newFile && newFile.metadata) {
         formData.value = { ...newFile.metadata };
@@ -93,7 +112,6 @@ watch(selectedFile, (newFile) => {
         formData.value = { bookTitle: '', chapterTitle: '', chapterNumber: '', author: '', coverArt: '' };
     }
 });
-
 
 // Drag and drop for Cover Art
 onMounted(() => {
@@ -113,11 +131,9 @@ onMounted(() => {
         });
     }
 });
-
-// Function to trigger file input click
 const triggerFilePathLoading = () => {
     const fileInput = document.getElementById('cover-art-file');
-    if(fileInput) {
+    if (fileInput) {
         fileInput.click();
     }
 }
@@ -131,10 +147,12 @@ const handleFilePathLoading = (event: Event) => {
     }
 };
 
+// Apply the input content to all entries awaiting conversion.
 const applyToAllFiles = <T extends keyof MetadataConfig>(field: T) => {
     fileListStore.applyMetadataToAll(field, formData.value[field]);
 }
 
+// Auto-save to File.metadata when input content changes.
 const confirmMetadataChange = <T extends keyof MetadataConfig>(field: T) => {
     if (selectedFile.value) {
         fileListStore.updateMetadata(selectedFile.value.key, { [field]: formData.value[field] });

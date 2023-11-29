@@ -36,7 +36,8 @@ const locales = {
         "Togglefullscreen": "Toggle Fullscreen",
         "Minimize": "Minimize",
         "Zoom": "Zoom",
-        "Front": "Bring All to Front"
+        "Front": "Bring All to Front",
+        "VoiceTester": "Test Voice Availability"
     },
     zh: {
         "File": "文件",
@@ -75,7 +76,8 @@ const locales = {
         "Togglefullscreen": "切换全屏",
         "Minimize": "最小化",
         "Zoom": "缩放",
-        "Front": "全部置顶"
+        "Front": "全部置顶",
+        "VoiceTester": "测试语音可用性"
     },    
     es: {
         "File": "Archivo",
@@ -114,7 +116,8 @@ const locales = {
         "Togglefullscreen": "Alternar pantalla completa",
         "Minimize": "Minimizar",
         "Zoom": "Zoom",
-        "Front": "Traer al frente"
+        "Front": "Traer al frente",
+        "VoiceTester": "Confirmar voces viables"
     }    
 }
 

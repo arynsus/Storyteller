@@ -7,6 +7,7 @@ export const useEdgeTTSConfigStore = defineStore({
             voice: 'zh-CN-XiaoxiaoNeural',
             pitch: 0,
             speed: 0,
+            wordsPerSection: 300,
             jobConcurrencyLimit: 1,
             sectionConcurrencyLimit: 1,
         } as EdgeTTSConfig,

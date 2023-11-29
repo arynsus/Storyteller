@@ -14,12 +14,11 @@ import { FileDataClass } from "../../global/types";
 import { analyzeMetadata } from "../../global/metadataAnalyzer";
 import { useI18n } from 'vue-i18n';
 
-// Inside your setup function
 const { t } = useI18n();
 const fileListStore = useFileListStore();
-
 const fileInput = ref<HTMLInputElement>();
 
+// Generate table data from files.
 const handleFilesProcessing = (files: File[]) => {
     files.forEach(file => {
         file.text().then(text => {
@@ -37,18 +36,17 @@ const handleFilesProcessing = (files: File[]) => {
     }
 };
 
+// Drag in files or click to choose.
 const handleDrop = (event: DragEvent) => {
     const droppedFiles = Array.from(event.dataTransfer?.files || []);
     handleFilesProcessing(droppedFiles.filter(file => file.name.endsWith('.txt')));
 };
-
 const handleFileInput = (event: Event) => {
     const files = (event.target as HTMLInputElement).files;
     if (files) {
         handleFilesProcessing(Array.from(files).filter(file => file.name.endsWith('.txt')));
     }
 };
-
 const triggerFileInput = () => {
     fileInput.value?.click();
 };

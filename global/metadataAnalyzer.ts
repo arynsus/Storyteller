@@ -83,8 +83,6 @@ export const analyzeMetadata = (filename: string) => {
                 chapterTitle: match[2]
             })
         },
-        // Add more patterns here
-        // ...
     ];
 
     // Iterate over each pattern to find a match
@@ -94,7 +92,7 @@ export const analyzeMetadata = (filename: string) => {
             const { chapterNumber, chapterTitle } = pattern.extract(match);
             metadata.chapterNumber = chapterNumber;
             metadata.chapterTitle = chapterTitle;
-            break; // Exit loop once a match is found
+            break;
         }
     }
 
