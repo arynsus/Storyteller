@@ -39,7 +39,6 @@ export const handleAddToList = async (event, files: FileData[], mainWindow: Brow
     });
 
     Promise.all(readFilePromises).then(fileList => {
-        console.log(fileList);
         mainWindow.webContents.send("add-to-list", fileList.filter(file => file !== null));
     });
 }
@@ -116,7 +115,7 @@ export const handleAudioLoad = async (event, audioUrl: string): Promise<void> =>
     });
 }
 
-// Download files (copy files to system download folder)
+// Download file (copy file to system download folder)
 export const handleFileDownload = async (event, filePath: string): Promise<void> => {
     const filename = path.basename(filePath);
     const userDownloadFolder = app.getPath('downloads');
@@ -129,6 +128,30 @@ export const handleFileDownload = async (event, filePath: string): Promise<void>
             event.reply('file-downloaded', { success: true, filename })
         }
     });
+}
+
+// Download all files (copy files to system download folder)
+export const handleAllFilesDownload = async (event, filePaths) => {
+    const userDownloadFolder = app.getPath('downloads');
+    const copyOperations = filePaths.map(filePath => {
+        const filename = path.basename(filePath);
+        const destination = path.join(userDownloadFolder, filename);
+        return new Promise((resolve, reject) => {
+            fs.copyFile(filePath, destination, err => {
+                if (err) {
+                    console.error('Error copying file to downloads folder:', err);
+                    reject(err);
+                } else {
+                    resolve(filePath);
+                }
+            });
+        });
+    });
+
+    const results = await Promise.allSettled(copyOperations);
+    const successfulCopies = results.filter(result => result.status === 'fulfilled').length;
+    const failedCopies = results.length - successfulCopies;
+    event.reply('files-downloaded', { succeeded: successfulCopies, failed: failedCopies });
 }
 
 // Inform vue frontend of errors

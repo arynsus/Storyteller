@@ -24,6 +24,13 @@
                 <div class="flex gap-1">
                     <a-input class="pl-0.5" :disabled="!selectedFile" style="width:55px" hide-button v-model="formData.chapterNumber" @change="confirmMetadataChange('chapterNumber')" />
                     <a-input class="grow" :disabled="!selectedFile" v-model="formData.chapterTitle" @change="confirmMetadataChange('chapterTitle')" />
+                    <a-tooltip content="Append serialized number to all unconverted files.">
+                        <a-button class="shrink-0" :disabled="!selectedFile" type="secondary" @click="serializeChapterNumber">
+                            <template #icon>
+                                <i class="fa-sharp fa-solid fa-arrow-down-1-9"></i>
+                            </template>
+                        </a-button>
+                    </a-tooltip>
                 </div>
             </div>
             <div id="form-author">
@@ -150,6 +157,11 @@ const handleFilePathLoading = (event: Event) => {
 // Apply the input content to all entries awaiting conversion.
 const applyToAllFiles = <T extends keyof MetadataConfig>(field: T) => {
     fileListStore.applyMetadataToAll(field, formData.value[field]);
+}
+
+const serializeChapterNumber = () => {
+    fileListStore.serializeChapterNumber(formData.value.chapterNumber)
+    formData.value = fileListStore.getSelected.metadata
 }
 
 // Auto-save to File.metadata when input content changes.

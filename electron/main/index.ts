@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions } 
 import { release } from 'node:os'
 import path from 'node:path'
 import { handleFileConversion, AUDIO_OUTPUT_DIR } from "./tts";
-import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownload, clearDirectory } from "./utils";
+import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownload, handleAllFilesDownload, clearDirectory } from "./utils";
 import { testVoiceAvailability } from "./edge";
 import locales from '../locales'
 
@@ -348,6 +348,7 @@ ipcMain.handle('open-win', (_, arg) => {
 ipcMain.on('convert-files', handleFileConversion);
 ipcMain.on('load-audio', handleAudioLoad);
 ipcMain.on('download-file', handleFileDownload);
+ipcMain.on('download-files', handleAllFilesDownload);
 ipcMain.on('make-chapters', handleMakeChapters);
 ipcMain.on('add-to-list', (event, files) => handleAddToList(event, files, win));
 ipcMain.on('voice-test-start', testVoiceAvailability);

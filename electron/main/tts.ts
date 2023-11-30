@@ -74,7 +74,8 @@ const processFile = async (file: FileData, config: EdgeTTSConfig): Promise<void>
     }
 
     wss.clients.forEach(client => client.send(JSON.stringify({ type: 'combine-start', filename: file.filename })));
-    const outputFilePath = path.join(AUDIO_OUTPUT_DIR, `${file.filename.slice(0, -4)}-${crypto.randomUUID()}.m4b`);
+
+    const outputFilePath = path.join(AUDIO_OUTPUT_DIR, `${formatOutputFilename(file)}_${crypto.randomUUID()}.m4b`);
 
     try {
         await combineSectionFiles(sectionFiles, outputFilePath, file.metadata);
@@ -84,6 +85,18 @@ const processFile = async (file: FileData, config: EdgeTTSConfig): Promise<void>
         handleWebSocketError(err, file.filename);
     }
 };
+
+function formatOutputFilename(file: FileData): string {
+    const { bookTitle, chapterTitle, chapterNumber } = file.metadata;
+    const nonEmptyFields = []
+    if (bookTitle) {nonEmptyFields.push(bookTitle)}
+    if (chapterNumber) {nonEmptyFields.push(chapterNumber)}
+    if (chapterTitle) {nonEmptyFields.push(chapterTitle)}
+    if (!chapterNumber && !chapterTitle) {
+        return file.filename.slice(0,-4)
+    }
+    return nonEmptyFields.join('_')
+}
 
 // Split txt content into small bite-size sections.
 const divideTextIntoSections = (text: string, maxLength: number = 300): string[] => {

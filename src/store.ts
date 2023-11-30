@@ -30,8 +30,9 @@ export const useFileListStore = defineStore({
     }),
     getters: {
         getSelected: (state) => state.files.find(file => file.selected),
+        getFinished: (state) => state.files.filter(file => file.finished),
         getFileWithKey: (state) => {
-            return (key: string) => state.files.find(file=>file.key == key)
+            return (key: string) => state.files.find(file => file.key == key)
         }
     },
     actions: {
@@ -72,6 +73,15 @@ export const useFileListStore = defineStore({
                 file.metadata = { ...file.metadata, ...metadata };
             }
         },
+        serializeChapterNumber(prefix:string) {
+            let serialNumber = 1
+            this.files.forEach(file => {
+                if (file.readyToStart) {
+                    file.metadata.chapterNumber = prefix + String(serialNumber)
+                    serialNumber++
+                }
+            })
+        },
         updateStatus(key: string, status: string) {
             const file = this.files.find(f => f.key === key);
             if (file) {
@@ -87,9 +97,9 @@ export const useFileListStore = defineStore({
                     case 'readyToStart':
                         file.readyToStart = true;
                         break;
-                        case 'inQueue':
-                            file.inQueue = true;
-                            break;
+                    case 'inQueue':
+                        file.inQueue = true;
+                        break;
                     case 'splitting':
                         file.splitting = true;
                         break;

@@ -1,6 +1,6 @@
 {
   "name": "storyteller",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "dist-electron/main/index.js",
   "description": "Convert text novel to audiobook via Edge's TTS.",
   "author": "Arynsus Mirhardt",

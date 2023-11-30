@@ -1,8 +1,10 @@
 <template>
     <a-modal v-model:visible="isModalVisible" :title="t('CHAPTERMAKER_DownloadFilesCardTitle')">
-        <a-list>
-            <a-list-item style="cursor: pointer;" v-for="(file, index) in splittedFiles" :key="index" @click="downloadFile(file.path)">{{ file.filename }}</a-list-item>
-        </a-list>
+        <a-scrollbar style="overflow: auto; height: 300px;">
+            <a-list>
+                <a-list-item style="cursor: pointer;" v-for="(file, index) in splittedFiles" :key="index" @click="downloadFile(file.path)">{{ file.filename }}</a-list-item>
+            </a-list>
+        </a-scrollbar>
         <template #footer>
             <a-button type="primary" @click="addToList">{{ t('CHAPTERMAKER_ButtonAddToList') }}</a-button>
         </template>
