@@ -48,11 +48,25 @@ export const analyzeMetadata = (filename: string) => {
                 chapterTitle: match[3]
             })
         },
+        { // Example: 第一卷 11 XXXXXXXX
+            regex: /第(\S+)卷 (\d+(?:\.\d+)?) (.+)/,
+            extract: (match: RegExpMatchArray) => ({
+                chapterNumber: convertChineseToArabic(match[1]) + '.' + match[2],
+                chapterTitle: match[3]
+            })
+        },
         { // Example: 第1卷 第11章 XXXXXXXX
             regex: /第(\d+)卷\s+第(\d+)章\s+(.+)/,
             extract: (match: RegExpMatchArray) => ({
                 chapterNumber: match[1] + '.' + match[2],
                 chapterTitle: match[3]
+            })
+        },
+        { // Example: 第一卷 XXXXXXXX
+            regex: /第(\S+)卷 (.+)/,
+            extract: (match: RegExpMatchArray) => ({
+                chapterNumber: convertChineseToArabic(match[1]),
+                chapterTitle: match[2]
             })
         },
         { // Example: Volume 1 Chapter 11 XXXXXXXX
