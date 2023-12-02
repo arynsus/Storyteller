@@ -122,11 +122,14 @@ watch(selectedFile, (newFile) => {
 
 // Drag and drop for Cover Art
 onMounted(() => {
-    const coverArtInput = document.querySelector('#form-cover-art input');
+    const coverArtInput = document.querySelector('#form-cover-art input') as HTMLInputElement;
     if (coverArtInput) {
         coverArtInput.addEventListener('drop', (event) => {
             event.preventDefault();
-            const dragEvent = event as DragEvent; // Type assertion here
+            if (coverArtInput.disabled) {
+                return; // Do nothing if the input is disabled
+            }
+            const dragEvent = event as DragEvent;
             if (dragEvent && dragEvent.dataTransfer) {
                 const file = dragEvent.dataTransfer.files[0];
                 formData.value.coverArt = file.path;
@@ -152,6 +155,7 @@ const handleFilePathLoading = (event: Event) => {
         formData.value.coverArt = file.path;
         confirmMetadataChange('coverArt')
     }
+    target.value = '';
 };
 
 // Apply the input content to all entries awaiting conversion.
