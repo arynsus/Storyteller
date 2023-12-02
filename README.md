@@ -18,6 +18,8 @@
     <br />
     <a href="https://github.com/arynsus/Storyteller/releases"><strong>Download release version »</strong></a>
     <br />
+    <a href="https://github.com/arynsus/Storyteller/blob/master/README.zh-cn.md"><strong>中文说明书 »</strong></a>
+    <br />
 
   </p>
 </div>
@@ -88,9 +90,14 @@ npm run build
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-1. Drag your .txt file into the section in the main UI marked by dotted lines, or click in the area to select files to upload. Only files with unique filenames will be listed in the main table.
-2. Click on any row in the table to highlight the file, then, in Metadata Settings section, input metadata. If your filename follow some easy to recognize formats, chapter number and chapter title should be autofilled. For the cover art, youo can drag local file into the input field, or click to upload, it also accepts online image files. The button on the right of each input field lets you apply the inputed value to all the txt files in the table that are waiting for conversion.
-3. Adjust the TTS Settings as needed and click on Convert. Note that Edge's server will refuse unusually frequent requests, so if you are not in a hurry, keep concurrent jobs and concurrent sections as 1. Alternatively, go extremely high for both numbers, Edge's server will close connection after initial batch, marking the files as error, but you can click on Convert again to retry, which will resume the converting progress.
+Here are the translations into fluent and native English, preserving the Markdown format:
+
+1. Drag a `.txt` file to the dotted area in the main interface, or click the area to select a file to upload. Note that only files with different names will be loaded into the list.
+2. Use the `Chapter Maker` in the `Window` menu to divide a full-volume text file into chapters, and import the split files into the conversion list with one click.
+3. Click any row in the table to select that file, then enter metadata in the `Metadata Config` section. If the file name follows a recognizable format, the system will automatically identify chapter numbers and titles. The buttons next to the input fields for book title, author name, and cover image can apply the entered content to all `.txt` files awaiting conversion in the table.
+4. To better organize the output files, use the button next to the chapter number input field to append sequence numbers to the end of the entered content. For example, after entering `2.`, clicking this button will overwrite the chapter numbers of all files in the list as `2.1`, `2.2`, `2.3`, and so on.
+5. For cover images, you can drag a local file into the input box or click to upload a local file. Alternatively, enter the link to an online image file. If the image is not available or is not an image file at the time of conversion, the system will ignore the image and generate an audiobook without a cover, so be careful not to delete the original local image after starting the conversion.
+6. Adjust the `TTS Config` as needed, then click `Convert`. Please note that Edge's servers will reject excessively frequent requests. Therefore, if you are not in a hurry, keep the `Concurrent jobs` and `Concurrent sections per job` at `1`. Another approach is to set these two numbers very high. Edge's servers will close the connection after the initial batch, and the conversion process will be marked as an error, but you can click `Convert` again to retry. The previous conversion progress will be retained.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -137,7 +144,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 [license-shield]: https://img.shields.io/github/license/arynsus/Storyteller?style=for-the-badge
 [license-url]: https://github.com/arynsus/Storyteller/blob/master/LICENSE.txt
 
-[product-screenshot]: ./screenshot.png
+[product-screenshot]: ./screenshot.en-us.png
 [Vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
 [Vue-url]: https://electronjs.org/
 [Electron.js]: https://img.shields.io/badge/Electron-JS-47848D?style=for-the-badge&logo=electron&logoColor=white
