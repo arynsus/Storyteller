@@ -10,7 +10,7 @@
                 <p class="form-label">{{ t('METADATACONFIG_FormLabelBookTitle') }}</p>
                 <div class="grow pl-0.5 flex gap-1">
                     <a-input :disabled="!selectedFile" v-model="formData.bookTitle" @change="confirmMetadataChange('bookTitle')" />
-                    <a-tooltip content="Apply to all unconverted files.">
+                    <a-tooltip :content="t('METADATACONFIG_FormTooltipAppyToAll')">
                         <a-button class="shrink-0" :disabled="!selectedFile" type="secondary" @click="applyToAllFiles('bookTitle')">
                             <template #icon>
                                 <i class="fa-sharp fa-solid fa-ellipsis"></i>
@@ -24,7 +24,7 @@
                 <div class="flex gap-1">
                     <a-input class="pl-0.5" :disabled="!selectedFile" style="width:55px" hide-button v-model="formData.chapterNumber" @change="confirmMetadataChange('chapterNumber')" />
                     <a-input class="grow" :disabled="!selectedFile" v-model="formData.chapterTitle" @change="confirmMetadataChange('chapterTitle')" />
-                    <a-tooltip content="Append serialized number to all unconverted files.">
+                    <a-tooltip :content="t('METADATACONFIG_FormTooltipSerializeChapterNumber')">
                         <a-button class="shrink-0" :disabled="!selectedFile" type="secondary" @click="serializeChapterNumber">
                             <template #icon>
                                 <i class="fa-sharp fa-solid fa-arrow-down-1-9"></i>
@@ -37,7 +37,7 @@
                 <p class="form-label">{{ t('METADATACONFIG_FormLabelAuthor') }}</p>
                 <div class="grow pl-0.5 flex gap-1">
                     <a-input :disabled="!selectedFile" v-model="formData.author" @change="confirmMetadataChange('author')" />
-                    <a-tooltip content="Apply to all unconverted files.">
+                    <a-tooltip :content="t('METADATACONFIG_FormTooltipAppyToAll')">
                         <a-button class="shrink-0" :disabled="!selectedFile" type="secondary" @click="applyToAllFiles('author')">
                             <template #icon>
                                 <i class="fa-sharp fa-solid fa-ellipsis"></i>
@@ -55,7 +55,7 @@
                     <input type="file" id="cover-art-file" @change="handleFilePathLoading" style="display: none;" />
 
                     <!-- Upload Button -->
-                    <a-tooltip content="Load a local file path.">
+                    <a-tooltip :content="t('METADATACONFIG_FormTooltipUploadCoverArt')">
                         <a-button class="shrink-0" :disabled="!selectedFile" type="secondary" @click="triggerFilePathLoading">
                             <template #icon>
                                 <i class="fa-sharp fa-solid fa-upload"></i>
@@ -63,7 +63,7 @@
                         </a-button>
                     </a-tooltip>
 
-                    <a-tooltip content="Apply to all unconverted files.">
+                    <a-tooltip :content="t('METADATACONFIG_FormTooltipAppyToAll')">
                         <a-button class="shrink-0" :disabled="!selectedFile" type="secondary" @click="applyToAllFiles('coverArt')">
                             <template #icon>
                                 <i class="fa-sharp fa-solid fa-ellipsis"></i>
