@@ -133,7 +133,9 @@ const combineSectionFiles = async (sectionFiles: { index: number, path: string }
 
     // Sort and input files
     sectionFiles.sort((a, b) => a.index - b.index).forEach(({ path }) => {
-        command.input(path);
+        if (fs.statSync(path).size > 0) {
+            command.input(path);
+        }
     });
 
 
