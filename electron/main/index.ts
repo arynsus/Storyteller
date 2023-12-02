@@ -103,7 +103,7 @@ function getMenuTemplate(locale) {
                 { type: 'separator' },
                 isMac ? { role: 'close', label: locale.Close } : { role: 'quit', label: locale.Quit }
             ] as MenuItemConstructorOptions[]
-        },
+        }  as MenuItemConstructorOptions,
         // { role: 'editMenu' }
         {
             label: locale.Edit,
@@ -232,7 +232,10 @@ async function createMainWindow() {
     process.env.LANGUAGE = systemLanguage.slice(0, 2)
     const menuTemplate = getMenuTemplate(locales[process.env.LANGUAGE]);
     const menu = Menu.buildFromTemplate(menuTemplate);
-    win.setMenu(menu)
+    if (isMac) {
+        Menu.setApplicationMenu(menu)
+    }
+        win.setMenu(menu)
 
     if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
         win.loadURL(url)

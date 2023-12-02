@@ -183,6 +183,7 @@ const combineSectionFiles = async (sectionFiles: { index: number, path: string }
         const coverArtPath = await getCoverArt(metadata.coverArt, outputFile);
         if (coverArtPath) {
             const coverArtCommand = `ffmpeg -i "${outputFile}" -i "${coverArtPath}" -map 0 -map 1 -c copy -disposition:1 attached_pic "${outputFile}.temp.m4b"`;
+            console.log(coverArtCommand)
             await new Promise<void>((resolve, reject) => {
                 exec(coverArtCommand, (error, stdout, stderr) => {
                     if (error) {
@@ -221,11 +222,13 @@ const getCoverArt = async (coverArtPathOrUrl: string, filename: string) => {
             // Convert to JPEG if not already
             buffer = await sharp(buffer).jpeg().toBuffer();
         }
-
+        createDirIfNeeded(COVER_ART_DIR)
         const outputPath = path.join(COVER_ART_DIR, `${crypto.randomUUID()}.jpg`);
         await sharp(buffer).toFile(outputPath);
         return outputPath;
     } catch (error) {
+        console.log("problem")
+        console.log(error)
         wss.clients.forEach(client => client.send(JSON.stringify({ type: 'cover-art-unavailable', filename })));
         return null;
     }
