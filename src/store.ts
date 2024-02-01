@@ -10,6 +10,7 @@ export const useEdgeTTSConfigStore = defineStore({
             wordsPerSection: 300,
             jobConcurrencyLimit: 1,
             sectionConcurrencyLimit: 1,
+            outputFormat: 'm4b',
         } as EdgeTTSConfig,
     }),
     getters: {
