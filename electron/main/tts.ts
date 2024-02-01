@@ -75,7 +75,7 @@ const processFile = async (file: FileData, config: EdgeTTSConfig): Promise<void>
 
     wss.clients.forEach(client => client.send(JSON.stringify({ type: 'combine-start', filename: file.filename })));
 
-    const outputFilePath = path.join(AUDIO_OUTPUT_DIR, `${formatOutputFilename(file)}_${crypto.randomUUID()}.m4b`);
+    const outputFilePath = path.join(AUDIO_OUTPUT_DIR, `${formatOutputFilename(file)}_${crypto.randomUUID()}.${config.outputFormat}`);
 
     try {
         await combineSectionFiles(sectionFiles, outputFilePath, file.metadata);
@@ -89,11 +89,11 @@ const processFile = async (file: FileData, config: EdgeTTSConfig): Promise<void>
 function formatOutputFilename(file: FileData): string {
     const { bookTitle, chapterTitle, chapterNumber } = file.metadata;
     const nonEmptyFields = []
-    if (bookTitle) {nonEmptyFields.push(bookTitle)}
-    if (chapterNumber) {nonEmptyFields.push(chapterNumber)}
-    if (chapterTitle) {nonEmptyFields.push(chapterTitle)}
+    if (bookTitle) { nonEmptyFields.push(bookTitle) }
+    if (chapterNumber) { nonEmptyFields.push(chapterNumber) }
+    if (chapterTitle) { nonEmptyFields.push(chapterTitle) }
     if (!chapterNumber && !chapterTitle) {
-        return file.filename.slice(0,-4)
+        return file.filename.slice(0, -4)
     }
     return nonEmptyFields.join('_')
 }
@@ -127,7 +127,8 @@ const convertSectionToMP3 = async (sectionText: string, outputFilePath: string, 
     const audioBuffer = await convertTextToSpeech(`<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"> <voice name="${config.voice}"><prosody rate="${String(config.speed)}%" pitch="${String(config.pitch)}%">${sectionText}</prosody ></voice > </speak >`);
     fs.writeFileSync(outputFilePath, audioBuffer);
 };
-// All sections are combined to one m4b file.
+
+// All sections are combined to one file of the chosen format.
 const combineSectionFiles = async (sectionFiles: { index: number, path: string }[], outputFile: string, metadata: MetadataConfig): Promise<void> => {
     const command = ffmpeg();
 
@@ -182,13 +183,20 @@ const combineSectionFiles = async (sectionFiles: { index: number, path: string }
     if (metadata.coverArt) {
         const coverArtPath = await getCoverArt(metadata.coverArt, outputFile);
         if (coverArtPath) {
-            const coverArtCommand = `${ffmpegBin.path} -i "${outputFile}" -i "${coverArtPath}" -map 0 -map 1 -c copy -disposition:1 attached_pic "${outputFile}.temp.m4b"`;
+            let coverArtCommand
+            if (path.extname(outputFile) == '.mp3') {
+                coverArtCommand = `${ffmpegBin.path} -i "${outputFile}" -i "${coverArtPath}" -map 0:0 -map 1:0 -c:a copy -c:v mjpeg -id3v2_version 3 -metadata:s:v title="Album cover" -metadata:s:v comment="Cover (front)" "${outputFile}.temp${path.extname(outputFile)}"`;
+            }
+            else {
+                coverArtCommand = `${ffmpegBin.path} -i "${outputFile}" -i "${coverArtPath}" -map 0 -map 1 -c copy -disposition:1 attached_pic "${outputFile}.temp${path.extname(outputFile)}"`;
+            }
+            console.log(coverArtCommand)
             await new Promise<void>((resolve, reject) => {
                 exec(coverArtCommand, (error, stdout, stderr) => {
                     if (error) {
                         reject(error);
                     } else {
-                        fs.renameSync(`${outputFile}.temp.m4b`, outputFile); // Replace original file
+                        fs.renameSync(`${outputFile}.temp${path.extname(outputFile)}`, outputFile); // Replace original file
                         resolve();
                     }
                 });

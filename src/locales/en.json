@@ -20,6 +20,7 @@
     "TTSCONFIG_FormLabelWordsPerSection": "Words per section",
     "TTSCONFIG_FormLabelConcurrentJobs": "Concurrent jobs",
     "TTSCONFIG_FormLabelConcurrentSections": "Con. sections/job",
+    "TTSCONFIG_OutputFormat": "Output Format",
     "METADATACONFIG_CardTitle": "Metadata Config",
     "METADATACONFIG_FormLabelBookTitle": "Book Title",
     "METADATACONFIG_FormLabelChapterNoAndTitle": "Chapter No. & Title",

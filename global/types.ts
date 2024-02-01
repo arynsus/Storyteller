@@ -4,7 +4,8 @@ export interface EdgeTTSConfig {
     pitch: number,
     wordsPerSection: number,
     jobConcurrencyLimit: number,
-    sectionConcurrencyLimit: number
+    sectionConcurrencyLimit: number,
+    outputFormat: string
 }
 
 export interface MetadataConfig {

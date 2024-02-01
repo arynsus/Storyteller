@@ -20,6 +20,7 @@
     "TTSCONFIG_FormLabelConcurrentJobs": "并行任务数",    
     "TTSCONFIG_FormLabelWordsPerSection": "单分块字数",
     "TTSCONFIG_FormLabelConcurrentSections": "并行分块数",
+    "TTSCONFIG_OutputFormat": "输出格式",
     "METADATACONFIG_CardTitle": "元数据设置",
     "METADATACONFIG_FormLabelBookTitle": "书名",
     "METADATACONFIG_FormLabelChapterNoAndTitle": "章节号与标题",

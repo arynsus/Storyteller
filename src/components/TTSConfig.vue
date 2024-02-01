@@ -31,6 +31,12 @@
                 <p class="form-label">{{ t('TTSCONFIG_FormLabelConcurrentSections') }}</p>
                 <a-slider class="grow pl-0.5" :min="1" :max="20" show-input :show-tooltip="false" v-model="edgeTTSConfigStore.config.sectionConcurrencyLimit" />
             </div>
+            <div id="voice">
+                <p class="form-label">{{ t('TTSCONFIG_OutputFormat') }}</p>
+                <a-select v-model="edgeTTSConfigStore.config.outputFormat" default-value="m4b">
+                    <a-option v-for="format in formats">{{ format }}</a-option>
+                </a-select>
+            </div>
         </div>
     </a-card>
 </template>
@@ -150,6 +156,11 @@ const voices = [
     "es-VE-SebastianNeural",
 ]
 
+const formats = [
+    "m4b",
+    "mp3",
+    "m4a"
+]
 </script>
 
 <style>
