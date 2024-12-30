@@ -37,7 +37,7 @@
             <!-- Voice selection -->
             <div id="voice" class="mt-3">
                 <p class="form-label">{{ t('TTSCONFIG_FormLabelVoice') }}</p>
-                <a-select v-model="ttsConfigStore.config.voice" :allow-search="true">
+                <a-select v-model="ttsConfigStore.config.voice" :allow-search="true" @change="saveConfig">
                     <a-option v-for="voice in voiceList" :key="voice" :value="voice">
                         {{ voice }}
                     </a-option>
