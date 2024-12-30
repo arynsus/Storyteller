@@ -1,28 +1,42 @@
 import { defineStore } from 'pinia';
-import { EdgeTTSConfig, FileData, MetadataConfig } from "../global/types";
-export const useEdgeTTSConfigStore = defineStore({
-    id: 'edgettsconfig',
+import { TTSConfig, FileData, MetadataConfig } from "../global/types";
+import { toRaw } from 'vue'; // Import toRaw
+import { ipcRenderer } from 'electron'; // Directly import ipcRenderer
+
+export const useTTSConfigStore = defineStore({
+    id: 'ttsconfig',
     state: () => ({
         config: {
+            service: "edge",
             voice: 'zh-CN-XiaoxiaoNeural',
             pitch: 0,
             speed: 0,
             wordsPerSection: 300,
             jobConcurrencyLimit: 1,
             sectionConcurrencyLimit: 1,
-            outputFormat: 'm4b',
-        } as EdgeTTSConfig,
+            outputFormat: 'm4b'
+        } as TTSConfig,
     }),
     getters: {
-        // getConfig: (state) => state.config,
+        getConfig: (state) => state.config,
     },
     actions: {
-        updateConfig(newConfig: EdgeTTSConfig) {
+        async loadConfigFromMain() {
+            const cfg: TTSConfig = await ipcRenderer.invoke('get-tts-config');
+            this.config = cfg;
+        },
+        async saveConfigToMain() {
+            if (!this.config) return;
+            const plainConfig = toRaw(this.config); // Convert to plain object
+            const saved: TTSConfig = await ipcRenderer.invoke('save-tts-config', plainConfig);
+            this.config = saved;
+        },
+        updateConfig(newConfig: Partial<TTSConfig>) {
+            if (!this.config) return;
             this.config = { ...this.config, ...newConfig };
         },
     },
 });
-
 
 export const useFileListStore = defineStore({
     id: 'filelist',
@@ -74,7 +88,7 @@ export const useFileListStore = defineStore({
                 file.metadata = { ...file.metadata, ...metadata };
             }
         },
-        serializeChapterNumber(prefix:string) {
+        serializeChapterNumber(prefix: string) {
             let serialNumber = 1
             this.files.forEach(file => {
                 if (file.readyToStart) {

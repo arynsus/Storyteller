@@ -33,12 +33,12 @@ import TTSConfigComponent from '../components/TTSConfig.vue';
 import MetadataConfigComponent from '../components/MetadataConfig.vue';
 import { Message } from '@arco-design/web-vue';
 import { ipcRenderer } from "electron";
-import { useEdgeTTSConfigStore, useFileListStore } from '../store';
+import { useTTSConfigStore, useFileListStore } from '../store';
 import { FileData } from "../../global/types";
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
-const edgeTTSConfigStore = useEdgeTTSConfigStore();
+const ttsConfigStore = useTTSConfigStore();
 const fileListStore = useFileListStore();
 
 // Button Functions
@@ -48,7 +48,7 @@ const clearList = () => {
 const convertFiles = () => {
     const filesToQueue = fileListStore.files.filter(file => file.readyToStart)
     const files = JSON.parse(JSON.stringify(filesToQueue));
-    const config = JSON.parse(JSON.stringify(edgeTTSConfigStore.config));
+    const config = JSON.parse(JSON.stringify(ttsConfigStore.config));
     ipcRenderer.send('convert-files', files, config);
     filesToQueue.forEach(file => {
         fileListStore.updateStatus(file.key, 'inQueue')

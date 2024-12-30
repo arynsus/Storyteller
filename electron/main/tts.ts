@@ -4,10 +4,11 @@ const fs = require('fs')
 const path = require('path')
 const ffmpeg = require('fluent-ffmpeg');
 const wordsCount = require('words-count').default;
-import convertTextToSpeech from "./edge";
+import { edgeTextToSpeech } from "./edge";
+import { azureTextToSpeech } from "./azure";
 const sharp = require('sharp');
 const { exec } = require('child_process');
-import { FileData, EdgeTTSConfig, MetadataConfig } from "../../global/types";
+import { FileData, TTSConfig, MetadataConfig } from "../../global/types";
 import { clearDirectory, wss, createDirIfNeeded, handleWebSocketError } from "./utils";
 
 // Disable this to use local ffmpeg and ffprobe binaries
@@ -25,7 +26,7 @@ clearDirectory(AUDIO_SECTIONS_DIR)
 clearDirectory(COVER_ART_DIR)
 
 // Receive a list of files to convert, send to queue.
-export const handleFileConversion = async (event: any, files: FileData[], config: EdgeTTSConfig): Promise<void> => {
+export const handleFileConversion = async (event: any, files: FileData[], config: TTSConfig): Promise<void> => {
     createDirIfNeeded(AUDIO_SECTIONS_DIR);
     createDirIfNeeded(AUDIO_OUTPUT_DIR);
     const tasks = files.map(file => () => processFile(file, config));
@@ -43,7 +44,8 @@ const asyncQueue = async (tasks: Array<() => Promise<void>>, jobConcurrencyLimit
     };
     await Promise.all(tasks.map(enqueue));
 };
-const processFile = async (file: FileData, config: EdgeTTSConfig): Promise<void> => {
+const processFile = async (file: FileData, config: TTSConfig): Promise<void> => {
+
     const text = fs.readFileSync(file.path, 'utf8');
     const sections = divideTextIntoSections(text, config.wordsPerSection);
     wss.clients.forEach(client => client.send(JSON.stringify({ type: 'split-start', filename: file.filename })));
@@ -123,9 +125,24 @@ const divideTextIntoSections = (text: string, maxLength: number = 300): string[]
 };
 
 // Each section is converted to audio and save to local cache.
-const convertSectionToMP3 = async (sectionText: string, outputFilePath: string, config: EdgeTTSConfig): Promise<void> => {
-    const audioBuffer = await convertTextToSpeech(`<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"> <voice name="${config.voice}"><prosody rate="${String(config.speed)}%" pitch="${String(config.pitch)}%">${sectionText}</prosody ></voice > </speak >`);
-    fs.writeFileSync(outputFilePath, audioBuffer);
+const convertSectionToMP3 = async (sectionText: string, outputFilePath: string, config: TTSConfig): Promise<void> => {
+    switch (config.service) {
+        case 'azure':
+            const audioData = await azureTextToSpeech({
+                text: sectionText,
+                region: config.azureRegion,
+                subscriptionKey: config.azureKey,
+                voice: config.voice,
+                rate: `${String(config.speed)}%`,
+                pitch: `${String(config.pitch)}%`,
+              });
+              fs.writeFileSync(outputFilePath, audioData);
+            break;
+        default:
+            const audioBuffer = await edgeTextToSpeech(`<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"> <voice name="${config.voice}"><prosody rate="${String(config.speed)}%" pitch="${String(config.pitch)}%">${sectionText}</prosody ></voice > </speak >`);
+            fs.writeFileSync(outputFilePath, audioBuffer);
+            break;
+    }
 };
 
 // All sections are combined to one file of the chosen format.

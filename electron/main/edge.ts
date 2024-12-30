@@ -178,7 +178,7 @@ class Service {
 
 const service = new Service();
 
-async function convertTextToSpeech(text: string): Promise<Buffer> {
+export async function edgeTextToSpeech(text: string): Promise<Buffer> {
     try {
         const format = "audio-24khz-48kbitrate-mono-mp3";
 
@@ -264,6 +264,3 @@ export const testVoiceAvailability = async () => {
         totalVoices,
     })));
 };
-
-
-export default convertTextToSpeech

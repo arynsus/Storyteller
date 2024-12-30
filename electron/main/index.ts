@@ -1,10 +1,12 @@
-import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions, contextBridge } from 'electron'
 import { release } from 'node:os'
 import path from 'node:path'
+import fs from 'fs';
 import { handleFileConversion, AUDIO_OUTPUT_DIR } from "./tts";
 import { handleMakeChapters, handleAddToList, handleAudioLoad, handleFileDownload, handleAllFilesDownload, clearDirectory } from "./utils";
 import { testVoiceAvailability } from "./edge";
 import locales from '../locales'
+import { TTSConfig } from "../../global/types";
 
 // The built directory structure
 //
@@ -22,6 +24,8 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
     ? path.join(process.env.DIST_ELECTRON, '../public')
     : process.env.DIST
 process.env.LANGUAGE = "en"
+const userDataPath = app.getPath("userData");
+const configFilePath = path.join(userDataPath, "tts-config.json");
 
 
 // Disable GPU Acceleration
@@ -38,7 +42,7 @@ if (!app.requestSingleInstanceLock()) {
 // Remove electron security warnings
 // This warning only shows in development mode
 // Read more on https://www.electronjs.org/docs/latest/tutorial/security
-// process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
+process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 let win: BrowserWindow | null = null
 // Here, you can also use other preload
@@ -103,7 +107,7 @@ function getMenuTemplate(locale) {
                 { type: 'separator' },
                 isMac ? { role: 'close', label: locale.Close } : { role: 'quit', label: locale.Quit }
             ] as MenuItemConstructorOptions[]
-        }  as MenuItemConstructorOptions,
+        } as MenuItemConstructorOptions,
         // { role: 'editMenu' }
         {
             label: locale.Edit,
@@ -235,7 +239,7 @@ async function createMainWindow() {
     if (isMac) {
         Menu.setApplicationMenu(menu)
     }
-        win.setMenu(menu)
+    win.setMenu(menu)
 
     if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
         win.loadURL(url)
@@ -306,7 +310,38 @@ async function createVoiceTesterWindow() {
     }
 }
 
-app.whenReady().then(createMainWindow)
+let ttsConfig: TTSConfig;
+
+function loadConfig(): void {
+    if (fs.existsSync(configFilePath)) {
+        const data = fs.readFileSync(configFilePath, "utf-8");
+        ttsConfig = JSON.parse(data) as TTSConfig;
+    } else {
+        // default config
+        ttsConfig = {
+            service: "edge",
+            voice: "zh-CN-XiaoxiaoNeural",
+            pitch: 0,
+            speed: 0,
+            wordsPerSection: 300,
+            jobConcurrencyLimit: 1,
+            sectionConcurrencyLimit: 1,
+            outputFormat: "m4b",
+            azureKey: "",
+            azureRegion: "",
+        };
+        saveConfig(ttsConfig);
+    }
+}
+
+function saveConfig(config: TTSConfig): void {
+    fs.writeFileSync(configFilePath, JSON.stringify(config, null, 2), "utf-8");
+}
+
+app.whenReady().then(() => {
+    loadConfig();
+    createMainWindow();
+});
 
 app.on('window-all-closed', () => {
     win = null
@@ -329,7 +364,6 @@ app.on('activate', () => {
         createMainWindow()
     }
 })
-
 
 // New window example arg: new windows url
 ipcMain.handle('open-win', (_, arg) => {
@@ -356,3 +390,12 @@ ipcMain.on('make-chapters', handleMakeChapters);
 ipcMain.on('add-to-list', (event, files) => handleAddToList(event, files, win));
 ipcMain.on('voice-test-start', testVoiceAvailability);
 ipcMain.on('change-language', (event, language) => changeLanguage(language));
+ipcMain.handle('get-tts-config', () => {
+    return ttsConfig;
+});
+
+ipcMain.handle('save-tts-config', (event, newConfig: TTSConfig) => {
+    ttsConfig = { ...ttsConfig, ...newConfig };
+    saveConfig(ttsConfig);
+    return ttsConfig;
+});

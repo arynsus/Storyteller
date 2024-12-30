@@ -1,12 +1,35 @@
-export interface EdgeTTSConfig {
-    voice: string,
-    speed: number,
-    pitch: number,
-    wordsPerSection: number,
-    jobConcurrencyLimit: number,
-    sectionConcurrencyLimit: number,
-    outputFormat: string
-}
+// export interface EdgeTTSConfig {
+//     voice: string,
+//     speed: number,
+//     pitch: number,
+//     wordsPerSection: number,
+//     jobConcurrencyLimit: number,
+//     sectionConcurrencyLimit: number,
+//     outputFormat: string
+// }
+
+// export interface AzureTTSConfig extends EdgeTTSConfig {
+//     region: string,
+//       subscriptionKey: string,
+// }
+
+// global/types.ts
+export interface TTSConfig {
+    // Common
+    service: "edge" | "azure";
+    voice: string;
+    pitch: number;
+    speed: number;
+    wordsPerSection: number;
+    jobConcurrencyLimit: number;
+    sectionConcurrencyLimit: number;
+    outputFormat: string;
+  
+    // Azure-specific
+    azureKey?: string;
+    azureRegion?: string;
+  }
+  
 
 export interface MetadataConfig {
     bookTitle?: string,
