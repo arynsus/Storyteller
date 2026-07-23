@@ -1,160 +1,187 @@
-import { BrowserWindow, app } from 'electron';
-const wordsCount = require('words-count').default;
-const WebSocket = require('ws');
-import fs from 'fs';
-import { readFile } from 'fs/promises';
-import path from 'path';
-import { FileDataClass, FileData } from "../../global/types";
+import { app } from "electron";
+import fs from "fs";
+import { readFile } from "fs/promises";
+import path from "path";
+import wordsCountModule from "words-count";
+import { FileDataClass, FileData, ChapterPreview, MakeChaptersResult } from "../../global/types";
 import { analyzeMetadata } from "../../global/metadataAnalyzer";
+import { emitAddToList } from "./emitter";
+
+const wordsCount = (wordsCountModule as unknown as { default: (t: string) => number }).default ?? wordsCountModule;
 
 // Set up directories
-const USER_DATA_PATH = app.getPath('userData');
-const CHAPTER_TXT_DIR = path.join(USER_DATA_PATH, 'chapter_txt');
+const USER_DATA_PATH = app.getPath("userData");
+const CHAPTER_TXT_DIR = path.join(USER_DATA_PATH, "chapter_txt");
 
-// Set up WebSocket server
-function setupWebSocketServer() {
-    const wss = new WebSocket.Server({ port: 8080 });
-    return wss;
-}
-export const wss = setupWebSocketServer();
-
-export const createDirIfNeeded = (dirPath) => {
+export const createDirIfNeeded = (dirPath: string): void => {
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
     }
 };
 
-// Add results of Chapter Maker to TTS conversion list
-export const handleAddToList = async (event, files: FileData[], mainWindow: BrowserWindow) => {
-    const readFilePromises = files.map(file => {
-        return readFile(file.path, 'utf8')
-            .then(text => {
-                const wordCount = wordsCount(text);
-                return new FileDataClass(file.filename, file.filename, file.path, wordCount, analyzeMetadata(file.filename));
-            })
-            .catch(err => {
-                console.error('Error reading file:', err);
-                return null;
-            });
-    });
-
-    Promise.all(readFilePromises).then(fileList => {
-        mainWindow.webContents.send("add-to-list", fileList.filter(file => file !== null));
-    });
-}
-
-// Chapter Maker functionality
-export const handleMakeChapters = (event, content, pattern) => {
-
-    createDirIfNeeded(CHAPTER_TXT_DIR);
-
-    // Split the content into lines
-    const lines = content.split(/\r?\n/);
-    let currentChapter = '';
-    let currentChapterContent = '';
-    let isFirstChapter = true;
-    const chapterFiles = [];
-
-    lines.forEach((line, index) => {
-        if (line.match(new RegExp(pattern))) {
-            if (!isFirstChapter) {
-                const safeChapterName = currentChapter.replace(/[\/\\:*?"<>|]/g, '');
-                const filePath = path.join(CHAPTER_TXT_DIR, `${safeChapterName}.txt`);
-                fs.writeFileSync(filePath, currentChapterContent, 'utf8');
-                chapterFiles.push({ filename: `${safeChapterName}.txt`, path: filePath, key: safeChapterName });
-            } else {
-                isFirstChapter = false;
-            }
-
-            currentChapter = line.trim();
-            currentChapterContent = line + '\n';
-        } else {
-            currentChapterContent += line + '\n';
-        }
-
-        // Save to local cache
-        if (index === lines.length - 1 && currentChapter) {
-            const safeChapterName = currentChapter.replace(/[\/\\:*?"<>|]/g, '');
-            const filePath = path.join(CHAPTER_TXT_DIR, `${safeChapterName}.txt`);
-            fs.writeFileSync(filePath, currentChapterContent, 'utf8');
-            chapterFiles.push({ filename: `${safeChapterName}.txt`, path: filePath, key: safeChapterName });
-        }
-    });
-
-    event.reply('chapters-made', chapterFiles);
-};
-
-export const clearDirectory = (dirPath) => {
-    const removedFiles = []
+export const clearDirectory = (dirPath: string): string[] => {
+    const removedFiles: string[] = [];
     try {
         if (fs.existsSync(dirPath)) {
-            const files = fs.readdirSync(dirPath);
-            for (const file of files) {
-                const filePath = path.join(dirPath, file);
-                fs.unlinkSync(filePath);
-                removedFiles.push(file)
+            for (const file of fs.readdirSync(dirPath)) {
+                fs.unlinkSync(path.join(dirPath, file));
+                removedFiles.push(file);
             }
         }
     } catch (err) {
         console.error(`Error clearing directory ${dirPath}:`, err);
     }
-    return removedFiles
+    return removedFiles;
 };
 
-clearDirectory(CHAPTER_TXT_DIR)
+clearDirectory(CHAPTER_TXT_DIR);
 
-// Load audio for result preview
-export const handleAudioLoad = async (event, audioUrl: string): Promise<void> => {
-    fs.readFile(audioUrl, (err: Error, data: Buffer | string) => {
-        if (err) {
-            handleWebSocketError(err)
-            event.reply('audio-loaded', { success: false });
-        } else {
-            event.reply('audio-loaded', { success: true, data: data.toString('base64') });
-        }
-    });
+function sanitizeFilename(name: string): string {
+    return name.replace(/[\/\\:*?"<>|]/g, "").trim() || "chapter";
 }
 
-// Download file (copy file to system download folder)
-export const handleFileDownload = async (event, filePath: string): Promise<void> => {
-    const filename = path.basename(filePath);
-    const userDownloadFolder = app.getPath('downloads');
-    const destination = path.join(userDownloadFolder, filename);
-    fs.copyFile(filePath, destination, (err: Error) => {
-        if (err) {
-            console.error('Error copying file to downloads folder:', err);
-            event.reply('file-downloaded', { success: false, err })
-        } else {
-            event.reply('file-downloaded', { success: true, filename })
-        }
-    });
-}
+/**
+ * Chapter Maker: split monolithic text into chapters *in memory* and return a
+ * preview. No files are written until the user commits via `handleAddToList`.
+ */
+export const handleMakeChapters = async (
+    _event: unknown,
+    content: string,
+    pattern: string,
+    flags: string
+): Promise<MakeChaptersResult> => {
+    if (!pattern) {
+        return { chapters: [], matchCount: 0, error: "EMPTY_PATTERN" };
+    }
 
-// Download all files (copy files to system download folder)
-export const handleAllFilesDownload = async (event, filePaths) => {
-    const userDownloadFolder = app.getPath('downloads');
-    const copyOperations = filePaths.map(filePath => {
-        const filename = path.basename(filePath);
-        const destination = path.join(userDownloadFolder, filename);
-        return new Promise((resolve, reject) => {
-            fs.copyFile(filePath, destination, err => {
-                if (err) {
-                    console.error('Error copying file to downloads folder:', err);
-                    reject(err);
-                } else {
-                    resolve(filePath);
-                }
-            });
+    let regex: RegExp;
+    try {
+        regex = new RegExp(pattern, flags || "");
+    } catch (err) {
+        return { chapters: [], matchCount: 0, error: err instanceof Error ? err.message : "INVALID_REGEX" };
+    }
+
+    const lines = content.split(/\r?\n/);
+    const blocks: { title: string; lines: string[]; isPreamble?: boolean }[] = [];
+    let matchCount = 0;
+    let current: { title: string; lines: string[]; isPreamble?: boolean } | null = null;
+
+    for (const line of lines) {
+        // Use a fresh test each line (avoid stateful lastIndex from the "g" flag).
+        const isHeading = new RegExp(pattern, flags.replace("g", "")).test(line);
+        if (isHeading) {
+            matchCount++;
+            if (current) blocks.push(current);
+            current = { title: line.trim(), lines: [line] };
+        } else if (current) {
+            current.lines.push(line);
+        } else {
+            // Text before the first heading -> preamble block.
+            if (!current) {
+                current = { title: "", lines: [line], isPreamble: true };
+            }
+        }
+    }
+    if (current) blocks.push(current);
+
+    // Drop an empty preamble (leading blank lines only).
+    const meaningful = blocks.filter((b) => b.lines.join("").trim().length > 0);
+
+    const usedNames = new Set<string>();
+    const chapters: ChapterPreview[] = meaningful.map((block, index) => {
+        const rawTitle = block.isPreamble ? block.title || "Introduction" : block.title || `Chapter ${index + 1}`;
+        let base = sanitizeFilename(rawTitle);
+        let unique = base;
+        let suffix = 2;
+        while (usedNames.has(unique.toLowerCase())) {
+            unique = `${base}_${suffix++}`;
+        }
+        usedNames.add(unique.toLowerCase());
+
+        const text = block.lines.join("\n");
+        return {
+            index,
+            title: rawTitle,
+            filename: `${unique}.txt`,
+            wordcount: wordsCount(text),
+            charcount: text.length,
+            snippet: text.trim().slice(0, 200),
+            content: text,
+            isPreamble: block.isPreamble,
+        };
+    });
+
+    return { chapters, matchCount };
+};
+
+/**
+ * Commit chapters: write each preview's content to disk, analyze metadata, and
+ * push the resulting queue entries to the main window.
+ */
+export const handleAddToList = async (
+    _event: unknown,
+    chapters: ChapterPreview[]
+): Promise<{ success: boolean; error?: string }> => {
+    try {
+        createDirIfNeeded(CHAPTER_TXT_DIR);
+        const fileList: FileData[] = chapters.map((chapter) => {
+            const filePath = path.join(CHAPTER_TXT_DIR, chapter.filename);
+            fs.writeFileSync(filePath, chapter.content, "utf8");
+            return new FileDataClass(
+                chapter.filename,
+                chapter.filename,
+                filePath,
+                chapter.wordcount,
+                analyzeMetadata(chapter.filename)
+            );
         });
-    });
+        emitAddToList(fileList);
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+};
 
-    const results = await Promise.allSettled(copyOperations);
-    const successfulCopies = results.filter(result => result.status === 'fulfilled').length;
-    const failedCopies = results.length - successfulCopies;
-    event.reply('files-downloaded', { succeeded: successfulCopies, failed: failedCopies });
-}
+// Load audio for result preview -> returns a data URL the renderer can play.
+export const handleAudioLoad = async (
+    _event: unknown,
+    audioUrl: string
+): Promise<{ success: boolean; dataUrl?: string }> => {
+    try {
+        const data = await readFile(audioUrl);
+        const ext = path.extname(audioUrl).replace(".", "") || "mp3";
+        const mime = ext === "m4b" || ext === "m4a" ? "audio/mp4" : "audio/mpeg";
+        return { success: true, dataUrl: `data:${mime};base64,${data.toString("base64")}` };
+    } catch {
+        return { success: false };
+    }
+};
 
-// Inform vue frontend of errors
-export const handleWebSocketError = (error: Error, filename?: string) => {
-    wss.clients.forEach(client => client.send(JSON.stringify({ type: 'error', error: error.message, filename })));
+// Download file (copy file to system download folder).
+export const handleFileDownload = async (
+    _event: unknown,
+    filePath: string
+): Promise<{ success: boolean; filename?: string; error?: string }> => {
+    const filename = path.basename(filePath);
+    const destination = path.join(app.getPath("downloads"), filename);
+    try {
+        await fs.promises.copyFile(filePath, destination);
+        return { success: true, filename };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+};
+
+// Download all files (copy files to system download folder).
+export const handleAllFilesDownload = async (
+    _event: unknown,
+    filePaths: string[]
+): Promise<{ succeeded: number; failed: number }> => {
+    const results = await Promise.allSettled(
+        filePaths.map((filePath) =>
+            fs.promises.copyFile(filePath, path.join(app.getPath("downloads"), path.basename(filePath)))
+        )
+    );
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    return { succeeded, failed: results.length - succeeded };
 };

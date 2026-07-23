@@ -1,20 +1,20 @@
-import { defineStore } from 'pinia';
-import { TTSConfig, FileData, MetadataConfig } from "../global/types";
-import { toRaw } from 'vue'; // Import toRaw
-import { ipcRenderer } from 'electron'; // Directly import ipcRenderer
+import { defineStore } from "pinia";
+import { toRaw } from "vue";
+import { TTSConfig, FileData, MetadataConfig, resolveEffectiveConfig } from "../global/types";
 
-export const useTTSConfigStore = defineStore({
-    id: 'ttsconfig',
+export const useTTSConfigStore = defineStore("ttsconfig", {
     state: () => ({
         config: {
             service: "edge",
-            voice: 'zh-CN-XiaoxiaoNeural',
+            voice: "zh-CN-XiaoxiaoNeural",
             pitch: 0,
             speed: 0,
             wordsPerSection: 300,
             jobConcurrencyLimit: 1,
             sectionConcurrencyLimit: 1,
-            outputFormat: 'm4b'
+            outputFormat: "m4b",
+            azureKey: "",
+            azureRegion: "",
         } as TTSConfig,
     }),
     getters: {
@@ -22,33 +22,29 @@ export const useTTSConfigStore = defineStore({
     },
     actions: {
         async loadConfigFromMain() {
-            const cfg: TTSConfig = await ipcRenderer.invoke('get-tts-config');
-            this.config = cfg;
+            const cfg = await window.storyteller.getConfig();
+            if (cfg) this.config = { ...this.config, ...cfg };
         },
         async saveConfigToMain() {
             if (!this.config) return;
-            const plainConfig = toRaw(this.config); // Convert to plain object
-            const saved: TTSConfig = await ipcRenderer.invoke('save-tts-config', plainConfig);
-            this.config = saved;
+            const saved = await window.storyteller.saveConfig(toRaw(this.config));
+            if (saved) this.config = saved;
         },
         updateConfig(newConfig: Partial<TTSConfig>) {
-            if (!this.config) return;
             this.config = { ...this.config, ...newConfig };
         },
     },
 });
 
-export const useFileListStore = defineStore({
-    id: 'filelist',
+export const useFileListStore = defineStore("filelist", {
     state: () => ({
         files: [] as FileData[],
     }),
     getters: {
-        getSelected: (state) => state.files.find(file => file.selected),
-        getFinished: (state) => state.files.filter(file => file.finished),
-        getFileWithKey: (state) => {
-            return (key: string) => state.files.find(file => file.key == key)
-        }
+        getSelected: (state) => state.files.find((file) => file.selected),
+        getFinished: (state) => state.files.filter((file) => file.finished),
+        getChecked: (state) => state.files.filter((file) => file.checked),
+        getFileWithKey: (state) => (key: string) => state.files.find((file) => file.key === key),
     },
     actions: {
         addFile(file: FileData) {
@@ -57,78 +53,122 @@ export const useFileListStore = defineStore({
             }
         },
         removeFile(key: string) {
-            this.files = this.files.filter(file => file.key !== key);
+            this.files = this.files.filter((file) => file.key !== key);
         },
         updateFile(key: string, updatedData: Partial<FileData>) {
-            const index = this.files.findIndex(file => file.key === key);
+            const index = this.files.findIndex((file) => file.key === key);
             if (index !== -1) {
                 this.files[index] = { ...this.files[index], ...updatedData };
             }
         },
         clearList() {
-            this.files = []
+            this.files = [];
         },
         toggleSelect(key: string) {
-            this.files = this.files.map(file => {
-                if (file.key === key) {
-                    return { ...file, selected: !file.selected };
-                }
-                return { ...file, selected: false };
+            this.files = this.files.map((file) =>
+                file.key === key ? { ...file, selected: !file.selected } : { ...file, selected: false }
+            );
+        },
+        toggleChecked(key: string) {
+            const file = this.files.find((f) => f.key === key);
+            if (file) file.checked = !file.checked;
+        },
+        setAllChecked(value: boolean) {
+            this.files.forEach((file) => (file.checked = value));
+        },
+        /** Files to target for bulk operations: checked ones if any, else all. */
+        bulkTargets(): FileData[] {
+            const checked = this.files.filter((f) => f.checked);
+            return checked.length > 0 ? checked : this.files;
+        },
+        applyMetadataFieldsToTargets(fields: (keyof MetadataConfig)[], source: MetadataConfig) {
+            this.bulkTargets().forEach((file) => {
+                if (!file.metadata) file.metadata = {};
+                fields.forEach((field) => {
+                    file.metadata[field] = source[field];
+                });
             });
         },
         applyMetadataToAll<T extends keyof MetadataConfig>(field: T, value: MetadataConfig[T]) {
-            this.files.forEach(file => {
-                if (!file.metadata) file.metadata = {} as MetadataConfig;
+            this.bulkTargets().forEach((file) => {
+                if (!file.metadata) file.metadata = {};
                 file.metadata[field] = value;
             });
         },
         updateMetadata(key: string, metadata: Partial<MetadataConfig>) {
-            const file = this.files.find(f => f.key === key);
+            const file = this.files.find((f) => f.key === key);
             if (file) {
                 file.metadata = { ...file.metadata, ...metadata };
             }
         },
         serializeChapterNumber(prefix: string) {
-            let serialNumber = 1
-            this.files.forEach(file => {
+            let serialNumber = 1;
+            this.files.forEach((file) => {
                 if (file.readyToStart) {
-                    file.metadata.chapterNumber = prefix + String(serialNumber)
-                    serialNumber++
+                    if (!file.metadata) file.metadata = {};
+                    file.metadata.chapterNumber = prefix + String(serialNumber);
+                    serialNumber++;
                 }
-            })
+            });
+        },
+        // ---- Per-chapter TTS overrides (#3) ----
+        updateFileTtsConfig(key: string, partial: Partial<TTSConfig>) {
+            const file = this.files.find((f) => f.key === key);
+            if (file) {
+                file.ttsConfig = { ...(file.ttsConfig || {}), ...partial };
+                file.useCustomTts = true;
+            }
+        },
+        applyTtsConfigToAll(config: Partial<TTSConfig>) {
+            this.bulkTargets().forEach((file) => {
+                if (file.readyToStart) {
+                    file.ttsConfig = { ...config };
+                    file.useCustomTts = true;
+                }
+            });
+        },
+        resetFileTtsConfig(key: string) {
+            const file = this.files.find((f) => f.key === key);
+            if (file) {
+                file.ttsConfig = undefined;
+                file.useCustomTts = false;
+            }
+        },
+        effectiveConfig(key: string, globalConfig: TTSConfig): TTSConfig {
+            const file = this.files.find((f) => f.key === key);
+            if (!file) return globalConfig;
+            return resolveEffectiveConfig(globalConfig, file);
         },
         updateStatus(key: string, status: string) {
-            const file = this.files.find(f => f.key === key);
-            if (file) {
-                // Reset all relevant fields
-                file.splitting = false;
-                file.converting = false;
-                file.combining = false;
-                file.finished = false;
-                file.readyToStart = false
-                file.inQueue = false
+            const file = this.files.find((f) => f.key === key);
+            if (!file) return;
+            file.splitting = false;
+            file.converting = false;
+            file.combining = false;
+            file.finished = false;
+            file.readyToStart = false;
+            file.inQueue = false;
 
-                switch (status) {
-                    case 'readyToStart':
-                        file.readyToStart = true;
-                        break;
-                    case 'inQueue':
-                        file.inQueue = true;
-                        break;
-                    case 'splitting':
-                        file.splitting = true;
-                        break;
-                    case 'converting':
-                        file.converting = true;
-                        break;
-                    case 'combining':
-                        file.combining = true;
-                        break;
-                    case 'finished':
-                        file.finished = true;
-                        break;
-                }
+            switch (status) {
+                case "readyToStart":
+                    file.readyToStart = true;
+                    break;
+                case "inQueue":
+                    file.inQueue = true;
+                    break;
+                case "splitting":
+                    file.splitting = true;
+                    break;
+                case "converting":
+                    file.converting = true;
+                    break;
+                case "combining":
+                    file.combining = true;
+                    break;
+                case "finished":
+                    file.finished = true;
+                    break;
             }
-        }
+        },
     },
 });
