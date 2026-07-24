@@ -34,6 +34,8 @@ const api: StorytellerAPI = {
     changeLanguage: (language: string) => ipcRenderer.invoke("change-language", language),
     testVoices: () => ipcRenderer.invoke("test-voices"),
     clearOutputCache: () => ipcRenderer.invoke("clear-output-cache"),
+    getOutputCacheInfo: () => ipcRenderer.invoke("get-output-cache-info"),
+    openOutputCacheFolder: () => ipcRenderer.invoke("open-output-cache-folder"),
     openWindow: (name: "chapter-maker" | "voice-tester") => ipcRenderer.invoke("open-window", name),
 
     // push events

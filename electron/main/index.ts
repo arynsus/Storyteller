@@ -1,14 +1,16 @@
 import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions } from "electron";
 import path from "node:path";
 import fs from "fs";
-import { handleFileConversion, AUDIO_OUTPUT_DIR } from "./tts";
+import { handleFileConversion, clearFinishedOutputCache } from "./tts";
 import {
     handleMakeChapters,
     handleAddToList,
     handleAudioLoad,
     handleFileDownload,
     handleAllFilesDownload,
-    clearDirectory,
+    getDirectoryInfo,
+    createDirIfNeeded,
+    CONTENT_CACHE_DIR,
 } from "./utils";
 import { testVoiceAvailability } from "./edge";
 import locales from "../locales";
@@ -104,8 +106,8 @@ function getMenuTemplate(locale: (typeof locales)[keyof typeof locales]): MenuIt
                 {
                     label: locale.ClearOutputCache,
                     click: () => {
-                        const removed = clearDirectory(AUDIO_OUTPUT_DIR);
-                        win?.webContents.send("output-cache-cleared", removed.length);
+                        const removed = clearFinishedOutputCache();
+                        win?.webContents.send("output-cache-cleared", removed);
                     },
                 },
                 { type: "separator" },
@@ -185,14 +187,6 @@ function getMenuTemplate(locale: (typeof locales)[keyof typeof locales]): MenuIt
                 },
             ] as MenuItemConstructorOptions[],
         },
-        {
-            label: locale.Language,
-            submenu: [
-                { label: "English", click: () => changeLanguage("en") },
-                { label: "简体中文", click: () => changeLanguage("zh") },
-                { label: "Español", click: () => changeLanguage("es") },
-            ] as MenuItemConstructorOptions[],
-        },
     ];
 }
 
@@ -262,6 +256,7 @@ const DEFAULT_CONFIG: TTSConfig = {
     jobConcurrencyLimit: 1,
     sectionConcurrencyLimit: 1,
     outputFormat: "m4b",
+    cacheClearThresholdMB: 50,
     azureKey: "",
     azureRegion: "",
 };
@@ -328,7 +323,12 @@ ipcMain.handle("download-file", handleFileDownload);
 ipcMain.handle("download-files", handleAllFilesDownload);
 ipcMain.handle("test-voices", () => testVoiceAvailability());
 ipcMain.handle("change-language", (_event, language: string) => changeLanguage(language));
-ipcMain.handle("clear-output-cache", () => clearDirectory(AUDIO_OUTPUT_DIR).length);
+ipcMain.handle("clear-output-cache", () => clearFinishedOutputCache());
+ipcMain.handle("get-output-cache-info", () => getDirectoryInfo(CONTENT_CACHE_DIR));
+ipcMain.handle("open-output-cache-folder", () => {
+    createDirIfNeeded(CONTENT_CACHE_DIR);
+    shell.openPath(CONTENT_CACHE_DIR);
+});
 ipcMain.handle("open-window", (_event, name: "chapter-maker" | "voice-tester") => {
     if (name === "chapter-maker") createChapterMakerWindow();
     else if (name === "voice-tester") createVoiceTesterWindow();

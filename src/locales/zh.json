@@ -102,8 +102,22 @@
     "TTSCONFIG_ApplyToSelected": "应用到所选",
     "TTSCONFIG_AzureHint": "请在设置（齿轮图标）中填写 Azure 区域与密钥。",
     "SETTINGS_Title": "设置",
+    "SETTINGS_LanguageSection": "语言",
     "SETTINGS_PerformanceSection": "队列性能",
     "SETTINGS_PerformanceHint": "并发越高越快，但微软可能限流或断开连接。",
+    "SETTINGS_CacheSection": "输出缓存",
+    "SETTINGS_CacheThresholdLabel": "超过阈值时提醒",
+    "SETTINGS_CacheThresholdHint": "当输出缓存超过此大小时，清除缓存图标会变红。",
     "SETTINGS_AzureSection": "Azure 凭据",
-    "SETTINGS_AzureHint": "仅当章节使用 Azure（付费）服务时需要填写。"
+    "SETTINGS_AzureHint": "仅当章节使用 Azure（付费）服务时需要填写。",
+    "NOTIFICATIONS_Title": "通知",
+    "NOTIFICATIONS_Empty": "暂无通知。",
+    "NOTIFICATIONS_ClearAll": "全部清除",
+    "CACHE_ModalTitle": "清除输出缓存",
+    "CACHE_Loading": "正在计算…",
+    "CACHE_FilesSuffix": "个文件",
+    "CACHE_Hint": "此操作将永久删除内容缓存中已完成的有声书文件及未使用的封面图。已下载的文件和仍在排队等待转换的章节不受影响。",
+    "CACHE_ButtonOpenFolder": "打开缓存文件夹",
+    "CACHE_ButtonClear": "清除缓存",
+    "CACHE_ButtonCancel": "取消"
 }

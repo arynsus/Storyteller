@@ -8,7 +8,7 @@ import wordsCountModule from "words-count";
 import { edgeTextToSpeech } from "./edge";
 import { azureTextToSpeech } from "./azure";
 import { FileData, TTSConfig, MetadataConfig, resolveEffectiveConfig } from "../../global/types";
-import { clearDirectory, createDirIfNeeded } from "./utils";
+import { clearDirectory, createDirIfNeeded, CONTENT_CACHE_DIR } from "./utils";
 import { emitConversionEvent, emitError } from "./emitter";
 
 const wordsCount = (wordsCountModule as unknown as { default: (t: string) => number }).default ?? wordsCountModule;
@@ -24,11 +24,21 @@ process.env.FFPROBE_PATH = ffprobeBin.path;
 
 // Set up directories
 const USER_DATA_PATH = app.getPath("userData");
-const AUDIO_SECTIONS_DIR = path.join(USER_DATA_PATH, "audio_sections");
-const COVER_ART_DIR = path.join(USER_DATA_PATH, "cover_arts");
-export const AUDIO_OUTPUT_DIR = path.join(USER_DATA_PATH, "audio_output");
+const AUDIO_SECTIONS_DIR = path.join(CONTENT_CACHE_DIR, "audio_sections");
+const COVER_ART_DIR = path.join(CONTENT_CACHE_DIR, "cover_arts");
+export const AUDIO_OUTPUT_DIR = path.join(CONTENT_CACHE_DIR, "audio_output");
 clearDirectory(AUDIO_SECTIONS_DIR);
 clearDirectory(COVER_ART_DIR);
+
+// Manual "Clear Cache" only removes what's always safe to delete: finished
+// output and the (already-embedded, never revisited) cover art copies. Split
+// section files and Chapter Maker source text are left alone since they may
+// back an in-progress conversion or a still-queued, unconverted chapter.
+export function clearFinishedOutputCache(): number {
+    const removedOutput = clearDirectory(AUDIO_OUTPUT_DIR);
+    const removedCoverArt = clearDirectory(COVER_ART_DIR);
+    return removedOutput.length + removedCoverArt.length;
+}
 
 // Guard against two conversion runs processing the same file at once (e.g. the
 // user clicks "Convert" again before the previous run finished). Without this

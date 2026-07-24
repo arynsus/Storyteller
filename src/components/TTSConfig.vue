@@ -75,7 +75,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from "vue";
-import { Message } from "@arco-design/web-vue";
 import { useTTSConfigStore, useFileListStore } from "../store";
 import { useI18n } from "vue-i18n";
 import { TTSConfig } from "../../global/types";
@@ -141,7 +140,6 @@ function applyToAll() {
     const override: Partial<TTSConfig> = {};
     chapterFields.forEach((f) => ((override as Record<string, unknown>)[f] = form[f]));
     fileListStore.applyTtsConfigToAll(override);
-    Message.success({ id: crypto.randomUUID(), content: t("TTSCONFIG_AppliedToAll"), duration: 1800, position: "bottom" });
 }
 
 function resetToDefault() {

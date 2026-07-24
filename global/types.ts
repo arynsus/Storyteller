@@ -13,6 +13,8 @@ export interface TTSConfig {
     jobConcurrencyLimit: number;
     sectionConcurrencyLimit: number;
     outputFormat: string;
+    /** Output cache size (in MB) above which the clear-cache icon flags as full. */
+    cacheClearThresholdMB: number;
 
     // Azure-specific
     azureKey?: string;
@@ -166,6 +168,8 @@ export interface StorytellerAPI {
     changeLanguage(language: string): Promise<void>;
     testVoices(): Promise<void>;
     clearOutputCache(): Promise<number>;
+    getOutputCacheInfo(): Promise<{ size: number; count: number }>;
+    openOutputCacheFolder(): Promise<void>;
     openWindow(name: "chapter-maker" | "voice-tester"): Promise<void>;
 
     onConversionEvent(cb: (event: ConversionEvent) => void): () => void;

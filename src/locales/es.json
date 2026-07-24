@@ -102,8 +102,22 @@
     "TTSCONFIG_ApplyToSelected": "Aplicar a seleccionados",
     "TTSCONFIG_AzureHint": "Configura tu región y clave de Azure en Ajustes (icono de engranaje).",
     "SETTINGS_Title": "Ajustes",
+    "SETTINGS_LanguageSection": "Idioma",
     "SETTINGS_PerformanceSection": "Rendimiento de la Cola",
     "SETTINGS_PerformanceHint": "Mayor concurrencia es más rápido, pero Microsoft puede limitar o cortar conexiones.",
+    "SETTINGS_CacheSection": "Caché de Salida",
+    "SETTINGS_CacheThresholdLabel": "Avisar cuando supere",
+    "SETTINGS_CacheThresholdHint": "Cuando la caché de salida supere este tamaño, el icono de limpiar caché se pondrá rojo.",
     "SETTINGS_AzureSection": "Credenciales de Azure",
-    "SETTINGS_AzureHint": "Necesario solo cuando un capítulo usa el servicio Azure (premium)."
+    "SETTINGS_AzureHint": "Necesario solo cuando un capítulo usa el servicio Azure (premium).",
+    "NOTIFICATIONS_Title": "Notificaciones",
+    "NOTIFICATIONS_Empty": "Estás al día.",
+    "NOTIFICATIONS_ClearAll": "Borrar todo",
+    "CACHE_ModalTitle": "Limpiar Caché de Salida",
+    "CACHE_Loading": "Calculando…",
+    "CACHE_FilesSuffix": "archivo(s)",
+    "CACHE_Hint": "Esto elimina permanentemente los audiolibros terminados y las portadas sin usar de la caché de contenido. Los archivos que ya descargaste y los capítulos aún en cola para convertir no se ven afectados.",
+    "CACHE_ButtonOpenFolder": "Abrir carpeta de caché",
+    "CACHE_ButtonClear": "Limpiar caché",
+    "CACHE_ButtonCancel": "Cancelar"
 }

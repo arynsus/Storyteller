@@ -9,9 +9,13 @@ import { emitAddToList } from "./emitter";
 
 const wordsCount = (wordsCountModule as unknown as { default: (t: string) => number }).default ?? wordsCountModule;
 
-// Set up directories
+// Set up directories. Everything Storyteller generates lives under one
+// content_cache folder so users can find (and clear) it in a single place,
+// instead of hunting through loose folders in the Electron userData root
+// (which also holds Chromium's own Blob Storage/Session Storage/etc.).
 const USER_DATA_PATH = app.getPath("userData");
-const CHAPTER_TXT_DIR = path.join(USER_DATA_PATH, "chapter_txt");
+export const CONTENT_CACHE_DIR = path.join(USER_DATA_PATH, "content_cache");
+const CHAPTER_TXT_DIR = path.join(CONTENT_CACHE_DIR, "chapter_txt");
 
 export const createDirIfNeeded = (dirPath: string): void => {
     if (!fs.existsSync(dirPath)) {
@@ -32,6 +36,32 @@ export const clearDirectory = (dirPath: string): string[] => {
         console.error(`Error clearing directory ${dirPath}:`, err);
     }
     return removedFiles;
+};
+
+// Recurses into subdirectories so a parent folder (e.g. content_cache) reports
+// the combined size/count of everything nested under it.
+export const getDirectoryInfo = (dirPath: string): { size: number; count: number } => {
+    let size = 0;
+    let count = 0;
+    try {
+        if (fs.existsSync(dirPath)) {
+            for (const entry of fs.readdirSync(dirPath)) {
+                const entryPath = path.join(dirPath, entry);
+                const stat = fs.statSync(entryPath);
+                if (stat.isDirectory()) {
+                    const nested = getDirectoryInfo(entryPath);
+                    size += nested.size;
+                    count += nested.count;
+                } else if (stat.isFile()) {
+                    size += stat.size;
+                    count++;
+                }
+            }
+        }
+    } catch (err) {
+        console.error(`Error reading directory ${dirPath}:`, err);
+    }
+    return { size, count };
 };
 
 clearDirectory(CHAPTER_TXT_DIR);

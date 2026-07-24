@@ -59,7 +59,6 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from "vue";
-import { Message } from "@arco-design/web-vue";
 import { useFileListStore } from "../store";
 import { MetadataConfig } from "../../global/types";
 import { useI18n } from "vue-i18n";
@@ -109,7 +108,6 @@ const applyLabel = computed(() => {
 });
 const applyBookInfo = () => {
     fileListStore.applyMetadataFieldsToTargets(["bookTitle", "author", "coverArt"], formData.value);
-    Message.success({ id: crypto.randomUUID(), content: t("METADATACONFIG_Applied"), duration: 1600, position: "bottom" });
 };
 const serializeChapterNumber = () => {
     fileListStore.serializeChapterNumber(formData.value.chapterNumber || "");

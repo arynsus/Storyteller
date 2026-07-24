@@ -2,6 +2,50 @@ import { defineStore } from "pinia";
 import { toRaw } from "vue";
 import { TTSConfig, FileData, MetadataConfig, resolveEffectiveConfig } from "../global/types";
 
+export type NotificationType = "success" | "error" | "warning" | "info";
+
+export interface AppNotification {
+    id: string;
+    type: NotificationType;
+    content: string;
+    timestamp: number;
+    read: boolean;
+}
+
+const NOTIFICATION_HISTORY_LIMIT = 100;
+
+export const useNotificationStore = defineStore("notifications", {
+    state: () => ({
+        notifications: [] as AppNotification[],
+    }),
+    getters: {
+        unreadCount: (state) => state.notifications.filter((n) => !n.read).length,
+    },
+    actions: {
+        push(type: NotificationType, content: string) {
+            this.notifications.unshift({
+                id: crypto.randomUUID(),
+                type,
+                content,
+                timestamp: Date.now(),
+                read: false,
+            });
+            if (this.notifications.length > NOTIFICATION_HISTORY_LIMIT) {
+                this.notifications.length = NOTIFICATION_HISTORY_LIMIT;
+            }
+        },
+        markAllRead() {
+            this.notifications.forEach((n) => (n.read = true));
+        },
+        remove(id: string) {
+            this.notifications = this.notifications.filter((n) => n.id !== id);
+        },
+        clear() {
+            this.notifications = [];
+        },
+    },
+});
+
 export const useTTSConfigStore = defineStore("ttsconfig", {
     state: () => ({
         config: {
@@ -13,6 +57,7 @@ export const useTTSConfigStore = defineStore("ttsconfig", {
             jobConcurrencyLimit: 1,
             sectionConcurrencyLimit: 1,
             outputFormat: "m4b",
+            cacheClearThresholdMB: 50,
             azureKey: "",
             azureRegion: "",
         } as TTSConfig,
@@ -32,6 +77,20 @@ export const useTTSConfigStore = defineStore("ttsconfig", {
         },
         updateConfig(newConfig: Partial<TTSConfig>) {
             this.config = { ...this.config, ...newConfig };
+        },
+    },
+});
+
+export const useCacheInfoStore = defineStore("cacheinfo", {
+    state: () => ({
+        size: 0,
+        count: 0,
+    }),
+    actions: {
+        async refresh() {
+            const info = await window.storyteller.getOutputCacheInfo();
+            this.size = info.size;
+            this.count = info.count;
         },
     },
 });

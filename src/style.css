@@ -231,6 +231,14 @@ body {
     background: rgba(255, 255, 255, 0.05);
     border-color: var(--st-border);
 }
+.st-rail-btn--danger {
+    color: var(--st-danger);
+}
+.st-rail-btn--danger:hover {
+    color: var(--st-danger);
+    background: rgba(255, 92, 114, 0.1);
+    border-color: rgba(255, 92, 114, 0.35);
+}
 .st-rail-logo {
     width: 40px;
     height: 40px;
@@ -318,4 +326,67 @@ html body .arco-input-wrapper,
 html body .arco-select-view,
 html body .arco-textarea-wrapper {
     border-radius: 10px;
+}
+
+/* Toasts (Message) and popovers default to Arco's neutral gray/red/green/orange,
+   which clash with this app's slate/violet palette. Re-point them at the same
+   --st-* tokens the rest of the UI uses. */
+html body .arco-message {
+    align-items: flex-start;
+    gap: 4px;
+    padding: 12px 16px;
+    background: var(--st-bg-3);
+    border: 1px solid var(--st-border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.75);
+}
+html body .arco-message-content {
+    color: var(--st-text-1);
+    font-size: 13px;
+}
+html body .arco-message-info,
+html body .arco-message-success,
+html body .arco-message-warning,
+html body .arco-message-error,
+html body .arco-message-loading {
+    background: var(--st-bg-3);
+    border-color: var(--st-border);
+}
+html body .arco-message-info .arco-message-icon,
+html body .arco-message-loading .arco-message-icon {
+    color: var(--st-accent-soft);
+}
+html body .arco-message-success .arco-message-icon {
+    color: var(--st-success);
+}
+html body .arco-message-warning .arco-message-icon {
+    color: var(--st-warning);
+}
+html body .arco-message-error .arco-message-icon {
+    color: var(--st-danger);
+}
+html body .arco-message-close-btn {
+    color: var(--st-text-3);
+}
+html body .arco-message-close-btn:hover {
+    color: var(--st-text-1);
+}
+
+html body .arco-popover-popup-content,
+html body .arco-popover-popup-arrow {
+    background: var(--st-bg-3);
+    border-color: var(--st-border);
+}
+html body .arco-popover-popup-content {
+    border-radius: 12px;
+    box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.75);
+}
+
+/* Cap modals at a sane height and let the body scroll internally, instead of
+   the whole dialog overflowing the viewport once its content grows tall.
+   Arco centers .arco-modal via `display: inline-block` + `vertical-align:
+   middle` (not flex) — capping the body's height instead of the modal's own
+   keeps that centering trick intact. The body already has `overflow: auto`. */
+html body .arco-modal-body {
+    max-height: calc(88vh - 49px);
 }

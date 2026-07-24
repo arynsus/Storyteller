@@ -83,7 +83,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed } from "vue";
-import { Message } from "@arco-design/web-vue";
+import { notify } from "../composables/notify";
 import { useFileListStore } from "../store";
 import { FileData, ConversionEvent } from "../../global/types";
 import { useI18n } from "vue-i18n";
@@ -111,12 +111,7 @@ onUnmounted(() => {
 
 function handleConversionEvent(res: ConversionEvent) {
     if (res.type === "error" && !res.filename) {
-        Message.error({
-            id: crypto.randomUUID(),
-            content: `${t("MESSAGE_SystemMalfunction")} ${res.error}`,
-            duration: 5000,
-            position: "bottom",
-        });
+        notify.error(`${t("MESSAGE_SystemMalfunction")} ${res.error}`, 5000);
         return;
     }
 
@@ -151,12 +146,7 @@ function handleConversionEvent(res: ConversionEvent) {
             fileListStore.updateFile(entry.key, {
                 warnings: [...(entry.warnings || []), "cover-art-unavailable"],
             });
-            Message.warning({
-                id: crypto.randomUUID(),
-                content: `${t("MESSAGE_CoverArtUnavailableBeforeFilename")}${entry.filename}${t("MESSAGE_CoverArtUnavailableAfterFilename")}`,
-                duration: 2000,
-                position: "bottom",
-            });
+            notify.warning(`${t("MESSAGE_CoverArtUnavailableBeforeFilename")}${entry.filename}${t("MESSAGE_CoverArtUnavailableAfterFilename")}`);
             break;
         case "error":
             fileListStore.updateFile(entry.key, {
@@ -164,12 +154,7 @@ function handleConversionEvent(res: ConversionEvent) {
                 finishedSections: 0,
             });
             fileListStore.updateStatus(entry.key, "readyToStart");
-            Message.error({
-                id: crypto.randomUUID(),
-                content: `${t("MESSAGE_ConversionFailureBeforeFilename")}${entry.filename}${t("MESSAGE_ConversionFailureAfterFilename")}${res.error}`,
-                duration: 5000,
-                position: "bottom",
-            });
+            notify.error(`${t("MESSAGE_ConversionFailureBeforeFilename")}${entry.filename}${t("MESSAGE_ConversionFailureAfterFilename")}${res.error}`, 5000);
             break;
     }
 }
@@ -222,19 +207,9 @@ const downloadFile = async (url?: string) => {
     if (!url) return;
     const res = await window.storyteller.downloadFile(url);
     if (res.success) {
-        Message.success({
-            id: crypto.randomUUID(),
-            content: `${t("MESSAGE_DownloadFileSuccessBeforeFilename")}${res.filename}${t("MESSAGE_DownloadFileSuccessAfterFilename")}`,
-            duration: 2000,
-            position: "bottom",
-        });
+        notify.success(`${t("MESSAGE_DownloadFileSuccessBeforeFilename")}${res.filename}${t("MESSAGE_DownloadFileSuccessAfterFilename")}`);
     } else {
-        Message.error({
-            id: crypto.randomUUID(),
-            content: `${t("MESSAGE_DownloadFileFailure")}${res.error}.`,
-            duration: 2000,
-            position: "bottom",
-        });
+        notify.error(`${t("MESSAGE_DownloadFileFailure")}${res.error}.`);
     }
 };
 </script>

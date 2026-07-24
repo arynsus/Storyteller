@@ -3,6 +3,8 @@
         <header class="flex items-baseline gap-3 shrink-0">
             <h1 class="text-[19px] font-bold tracking-tight">{{ t('CHAPTERMAKER_Title') }}</h1>
             <span class="st-text-3 text-[13px]">{{ t('CHAPTERMAKER_Subtitle') }}</span>
+            <div class="grow"></div>
+            <NotificationCenter variant="inline" class="self-center" />
         </header>
 
         <div class="flex gap-4 grow min-h-0">
@@ -83,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { Message } from "@arco-design/web-vue";
+import NotificationCenter from "../components/NotificationCenter.vue";
 import { ChapterPreview } from "../../global/types";
 import { useI18n } from "vue-i18n";
 
@@ -137,12 +139,7 @@ function handleFileDrop(event: DragEvent) {
 }
 
 async function addToList() {
-    const res = await window.storyteller.addToList(JSON.parse(JSON.stringify(chapters.value)));
-    if (res.success) {
-        Message.success({ id: crypto.randomUUID(), content: t("CHAPTERMAKER_AddedToList"), duration: 1800, position: "bottom" });
-    } else {
-        Message.error({ id: crypto.randomUUID(), content: res.error || "Error", duration: 2500, position: "bottom" });
-    }
+    await window.storyteller.addToList(JSON.parse(JSON.stringify(chapters.value)));
 }
 </script>
 

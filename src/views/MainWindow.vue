@@ -6,19 +6,22 @@
             <a-tooltip :content="t('CHAPTERMAKER_Title')" position="right">
                 <button class="st-rail-btn" @click="openChapterMaker"><i class="fa-sharp fa-light fa-scissors"></i></button>
             </a-tooltip>
-            <a-tooltip :content="t('VOICETESTER_Title')" position="right">
-                <button class="st-rail-btn" @click="openVoiceTester"><i class="fa-sharp fa-light fa-microphone-lines"></i></button>
-            </a-tooltip>
             <div class="grow"></div>
+            <NotificationCenter variant="rail" />
+            <a-tooltip :content="t('MAINWINDOW_ClearOutputCache')" position="right">
+                <button
+                    class="st-rail-btn"
+                    :class="{ 'st-rail-btn--danger': cacheOverThreshold }"
+                    @click="cacheModalVisible = true"
+                ><i class="fa-sharp fa-light fa-broom-wide"></i></button>
+            </a-tooltip>
             <a-tooltip :content="t('SETTINGS_Title')" position="right">
                 <button class="st-rail-btn" @click="settingsVisible = true"><i class="fa-sharp fa-light fa-gear"></i></button>
-            </a-tooltip>
-            <a-tooltip :content="t('MAINWINDOW_ClearOutputCache')" position="right">
-                <button class="st-rail-btn" @click="clearOutputCache"><i class="fa-sharp fa-light fa-broom-wide"></i></button>
             </a-tooltip>
         </nav>
 
         <SettingsModal :visible="settingsVisible" @close="settingsVisible = false" />
+        <ClearCacheModal :visible="cacheModalVisible" @close="cacheModalVisible = false" />
 
         <!-- Main content -->
         <div class="flex flex-col grow min-w-0 gap-4 p-5">
@@ -62,14 +65,21 @@ import AudioPlayerComponent from "../components/AudioPlayer.vue";
 import TTSConfigComponent from "../components/TTSConfig.vue";
 import MetadataConfigComponent from "../components/MetadataConfig.vue";
 import SettingsModal from "../components/SettingsModal.vue";
-import { Message } from "@arco-design/web-vue";
-import { useTTSConfigStore, useFileListStore } from "../store";
-import { FileData } from "../../global/types";
+import ClearCacheModal from "../components/ClearCacheModal.vue";
+import NotificationCenter from "../components/NotificationCenter.vue";
+import { notify } from "../composables/notify";
+import { useTTSConfigStore, useFileListStore, useCacheInfoStore } from "../store";
+import { FileData, ConversionEvent } from "../../global/types";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const ttsConfigStore = useTTSConfigStore();
 const fileListStore = useFileListStore();
+const cacheInfoStore = useCacheInfoStore();
+
+const cacheOverThreshold = computed(
+    () => cacheInfoStore.size > ttsConfigStore.config.cacheClearThresholdMB * 1024 * 1024
+);
 
 const readyCount = computed(() => fileListStore.files.filter((f) => f.readyToStart).length);
 const settingsVisible = ref(false);
@@ -88,53 +98,35 @@ const downloadAllFiles = async () => {
     const filePaths = fileListStore.getFinished.map((file) => file.url).filter(Boolean) as string[];
     const result = await window.storyteller.downloadFiles(filePaths);
     if (result.succeeded > 0) {
-        Message.success({
-            id: crypto.randomUUID(),
-            content: `${t("MESSAGE_DownloadFilesBeforeSuccessNumber")}${result.succeeded}${t("MESSAGE_DownloadFilesAfterSuccessNumber")}`,
-            duration: 2000,
-            position: "bottom",
-        });
+        notify.success(`${t("MESSAGE_DownloadFilesBeforeSuccessNumber")}${result.succeeded}${t("MESSAGE_DownloadFilesAfterSuccessNumber")}`);
     }
     if (result.failed > 0) {
-        Message.error({
-            id: crypto.randomUUID(),
-            content: `${t("MESSAGE_DownloadFilesBeforeFailureNumber")}${result.failed}${t("MESSAGE_DownloadFilesAfterFailureNumber")}`,
-            duration: 2000,
-            position: "bottom",
-        });
+        notify.error(`${t("MESSAGE_DownloadFilesBeforeFailureNumber")}${result.failed}${t("MESSAGE_DownloadFilesAfterFailureNumber")}`);
     }
 };
 
 const openChapterMaker = () => window.storyteller.openWindow("chapter-maker");
-const openVoiceTester = () => window.storyteller.openWindow("voice-tester");
-const clearOutputCache = async () => {
-    const removed = await window.storyteller.clearOutputCache();
-    Message.success({
-        id: crypto.randomUUID(),
-        content: `${t("MESSAGE_OutputCacheClearBeforeNumber")}${removed}${t("MESSAGE_OutputCacheClearAfterNumber")}`,
-        duration: 2000,
-        position: "bottom",
-    });
-};
+const cacheModalVisible = ref(false);
 
 let unsubAddToList: (() => void) | null = null;
 let unsubCacheCleared: (() => void) | null = null;
+let unsubConversion: (() => void) | null = null;
 onMounted(() => {
+    cacheInfoStore.refresh();
     unsubAddToList = window.storyteller.onAddToList((files: FileData[]) => {
         files.forEach((file) => fileListStore.addFile(file));
     });
-    unsubCacheCleared = window.storyteller.onOutputCacheCleared((removed: number) => {
-        Message.success({
-            id: crypto.randomUUID(),
-            content: `${t("MESSAGE_OutputCacheClearBeforeNumber")}${removed}${t("MESSAGE_OutputCacheClearAfterNumber")}`,
-            duration: 2000,
-            position: "bottom",
-        });
+    // Fired when cache is cleared from the app menu (bypasses the modal below).
+    unsubCacheCleared = window.storyteller.onOutputCacheCleared(() => cacheInfoStore.refresh());
+    // A finished conversion adds a new file to the output cache.
+    unsubConversion = window.storyteller.onConversionEvent((event: ConversionEvent) => {
+        if (event.type === "combine-complete") cacheInfoStore.refresh();
     });
 });
 onUnmounted(() => {
     unsubAddToList?.();
     unsubCacheCleared?.();
+    unsubConversion?.();
 });
 </script>
 

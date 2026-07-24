@@ -8,6 +8,18 @@
         modal-class="st-settings-modal"
     >
         <div class="flex flex-col gap-5 py-1">
+            <!-- Language -->
+            <div>
+                <p class="st-section-title">{{ t('SETTINGS_LanguageSection') }}</p>
+                <a-select :model-value="locale" :allow-search="false" @change="changeLanguage">
+                    <a-option value="en">English</a-option>
+                    <a-option value="zh">简体中文</a-option>
+                    <a-option value="es">Español</a-option>
+                </a-select>
+            </div>
+
+            <div class="st-divider"></div>
+
             <!-- Performance -->
             <div>
                 <p class="st-section-title">{{ t('SETTINGS_PerformanceSection') }}</p>
@@ -19,6 +31,25 @@
                 <div>
                     <p class="st-label">{{ t('TTSCONFIG_FormLabelConcurrentSections') }}</p>
                     <a-slider :min="1" :max="20" show-input :show-tooltip="false" v-model="config.sectionConcurrencyLimit" @change="save" />
+                </div>
+            </div>
+
+            <div class="st-divider"></div>
+
+            <!-- Output cache -->
+            <div>
+                <p class="st-section-title">{{ t('SETTINGS_CacheSection') }}</p>
+                <p class="st-hint mb-3">{{ t('SETTINGS_CacheThresholdHint') }}</p>
+                <div>
+                    <p class="st-label">{{ t('SETTINGS_CacheThresholdLabel') }}</p>
+                    <a-input-number
+                        :min="1"
+                        :max="10000"
+                        v-model="config.cacheClearThresholdMB"
+                        @change="save"
+                    >
+                        <template #suffix>MB</template>
+                    </a-input-number>
                 </div>
             </div>
 
@@ -52,11 +83,12 @@ import { azureRegions } from "../../global/azureRegions";
 defineProps<{ visible: boolean }>();
 defineEmits<{ (e: "close"): void }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const ttsConfigStore = useTTSConfigStore();
 const config = computed(() => ttsConfigStore.config);
 
 const save = () => ttsConfigStore.saveConfigToMain();
+const changeLanguage = (language: string) => window.storyteller.changeLanguage(language);
 </script>
 
 <style scoped>

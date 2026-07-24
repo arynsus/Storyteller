@@ -102,8 +102,22 @@
     "TTSCONFIG_ApplyToSelected": "Apply to selected",
     "TTSCONFIG_AzureHint": "Set your Azure region and key in Settings (gear icon).",
     "SETTINGS_Title": "Settings",
+    "SETTINGS_LanguageSection": "Language",
     "SETTINGS_PerformanceSection": "Queue Performance",
     "SETTINGS_PerformanceHint": "Higher concurrency is faster but Microsoft may throttle or drop connections.",
+    "SETTINGS_CacheSection": "Output Cache",
+    "SETTINGS_CacheThresholdLabel": "Warn above",
+    "SETTINGS_CacheThresholdHint": "When the output cache grows past this size, the clear-cache icon turns red.",
     "SETTINGS_AzureSection": "Azure Credentials",
-    "SETTINGS_AzureHint": "Required only when a chapter uses the Azure (premium) service."
+    "SETTINGS_AzureHint": "Required only when a chapter uses the Azure (premium) service.",
+    "NOTIFICATIONS_Title": "Notifications",
+    "NOTIFICATIONS_Empty": "You're all caught up.",
+    "NOTIFICATIONS_ClearAll": "Clear all",
+    "CACHE_ModalTitle": "Clear Output Cache",
+    "CACHE_Loading": "Calculating…",
+    "CACHE_FilesSuffix": "file(s)",
+    "CACHE_Hint": "This permanently deletes finished audiobook files and unused cover art from the content cache. Files you've already downloaded and chapters still queued for conversion are not affected.",
+    "CACHE_ButtonOpenFolder": "Open cache folder",
+    "CACHE_ButtonClear": "Clear cache",
+    "CACHE_ButtonCancel": "Cancel"
 }
