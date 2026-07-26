@@ -8,6 +8,9 @@ import {
     handleAudioLoad,
     handleFileDownload,
     handleAllFilesDownload,
+    handleImportDroppedFiles,
+    handleReadFileContent,
+    handleWriteFileContent,
     getDirectoryInfo,
     createDirIfNeeded,
     CONTENT_CACHE_DIR,
@@ -318,6 +321,9 @@ ipcMain.handle("save-tts-config", (_event, newConfig: TTSConfig) => {
 ipcMain.handle("convert-files", handleFileConversion);
 ipcMain.handle("make-chapters", handleMakeChapters);
 ipcMain.handle("add-to-list", handleAddToList);
+ipcMain.handle("import-dropped-files", handleImportDroppedFiles);
+ipcMain.handle("read-file-content", handleReadFileContent);
+ipcMain.handle("write-file-content", handleWriteFileContent);
 ipcMain.handle("load-audio", handleAudioLoad);
 ipcMain.handle("download-file", handleFileDownload);
 ipcMain.handle("download-files", handleAllFilesDownload);

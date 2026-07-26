@@ -29,6 +29,14 @@ export interface MetadataConfig {
     coverArt?: string; // URL or path to the image file
 }
 
+/** The subset of TTSConfig that can be applied per chapter (the rest — Azure
+ * credentials, concurrency limits, cache threshold — is infra-level and only
+ * edited globally in Settings). */
+export type ChapterTTSFields = Pick<
+    TTSConfig,
+    "service" | "voice" | "pitch" | "speed" | "wordsPerSection" | "outputFormat"
+>;
+
 export interface FileData {
     key: string;
     filename: string;
@@ -44,15 +52,14 @@ export interface FileData {
     finishedSections: number;
     totalSections: number;
     errors: string[];
-    selected: boolean;
-    /** Multi-select flag for bulk apply operations. */
+    /** Multi-select flag: bulk-apply target and the only "selected" concept in the UI. */
     checked?: boolean;
+    /** Set once the user edits this chapter's source text via the content editor. */
+    contentModified?: boolean;
     url?: string;
     metadata: MetadataConfig;
-    /** Per-file overrides layered on top of the global TTS config. */
-    ttsConfig?: Partial<TTSConfig>;
-    /** Whether this file uses custom (per-chapter) TTS settings. */
-    useCustomTts?: boolean;
+    /** TTS config applied to this job. Absent means "not configured yet" — the job can't start. */
+    ttsConfig?: ChapterTTSFields;
 }
 
 export class FileDataClass implements FileData {
@@ -70,11 +77,10 @@ export class FileDataClass implements FileData {
     finishedSections: number;
     totalSections: number;
     errors: string[];
-    selected: boolean;
     checked?: boolean;
+    contentModified?: boolean;
     metadata: MetadataConfig;
-    ttsConfig?: Partial<TTSConfig>;
-    useCustomTts?: boolean;
+    ttsConfig?: ChapterTTSFields;
 
     constructor(
         key: string,
@@ -97,20 +103,17 @@ export class FileDataClass implements FileData {
         this.errors = [];
         this.finishedSections = 0;
         this.totalSections = 1;
-        this.selected = false;
         this.checked = false;
         this.metadata = metadata;
-        this.useCustomTts = false;
     }
 }
 
 /**
- * Merge a file's per-chapter overrides on top of the global config.
- * A file only overrides fields it explicitly sets.
+ * Merge a file's applied per-chapter TTS fields on top of the global config
+ * (which still supplies Azure credentials and concurrency limits).
  */
-export function resolveEffectiveConfig(global: TTSConfig, file: Pick<FileData, "ttsConfig" | "useCustomTts">): TTSConfig {
-    if (!file.useCustomTts || !file.ttsConfig) return global;
-    return { ...global, ...file.ttsConfig };
+export function resolveEffectiveConfig(global: TTSConfig, file: Pick<FileData, "ttsConfig">): TTSConfig {
+    return file.ttsConfig ? { ...global, ...file.ttsConfig } : global;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +166,12 @@ export interface StorytellerAPI {
     makeChapters(content: string, pattern: string, flags: string): Promise<MakeChaptersResult>;
     addToList(chapters: ChapterPreview[]): Promise<{ success: boolean; error?: string }>;
     loadAudio(url: string): Promise<{ success: boolean; dataUrl?: string }>;
+    /** Copies dropped .txt content into the app's working area and returns queue-ready entries. */
+    importDroppedFiles(
+        files: { filename: string; content: string }[]
+    ): Promise<{ success: boolean; files?: FileData[]; error?: string }>;
+    readFileContent(path: string): Promise<{ success: boolean; content?: string; error?: string }>;
+    writeFileContent(path: string, content: string): Promise<{ success: boolean; wordcount?: number; error?: string }>;
     downloadFile(path: string): Promise<{ success: boolean; filename?: string; error?: string }>;
     downloadFiles(paths: string[]): Promise<{ succeeded: number; failed: number }>;
     changeLanguage(language: string): Promise<void>;

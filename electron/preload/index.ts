@@ -29,6 +29,10 @@ const api: StorytellerAPI = {
         ipcRenderer.invoke("make-chapters", content, pattern, flags),
     addToList: (chapters: ChapterPreview[]) => ipcRenderer.invoke("add-to-list", chapters),
     loadAudio: (url: string) => ipcRenderer.invoke("load-audio", url),
+    importDroppedFiles: (files: { filename: string; content: string }[]) =>
+        ipcRenderer.invoke("import-dropped-files", files),
+    readFileContent: (path: string) => ipcRenderer.invoke("read-file-content", path),
+    writeFileContent: (path: string, content: string) => ipcRenderer.invoke("write-file-content", path, content),
     downloadFile: (path: string) => ipcRenderer.invoke("download-file", path),
     downloadFiles: (paths: string[]) => ipcRenderer.invoke("download-files", paths),
     changeLanguage: (language: string) => ipcRenderer.invoke("change-language", language),

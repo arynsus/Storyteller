@@ -9,21 +9,6 @@
         </div>
 
         <div v-show="isOpen" class="p-4 flex flex-col gap-4">
-            <!-- Editing scope banner -->
-            <div class="st-scope">
-                <div class="flex items-center gap-2 min-w-0">
-                    <i class="fa-sharp fa-solid" :class="selectedFile ? 'fa-sliders' : 'fa-globe'"></i>
-                    <span class="truncate text-[13px]">
-                        {{ selectedFile ? t('TTSCONFIG_EditingChapter') : t('TTSCONFIG_EditingDefault') }}
-                        <b v-if="selectedFile" class="truncate">{{ selectedFile.filename }}</b>
-                    </span>
-                </div>
-                <a-tooltip v-if="selectedFile && selectedFile.useCustomTts" :content="t('TTSCONFIG_ResetTooltip')">
-                    <button class="st-mini-btn" @click="resetToDefault">
-                        <i class="fa-sharp fa-light fa-arrow-rotate-left"></i>
-                    </button>
-                </a-tooltip>
-            </div>
 
             <!-- Service -->
             <div>
@@ -41,32 +26,31 @@
             <!-- Voice -->
             <div>
                 <p class="st-label">{{ t('TTSCONFIG_FormLabelVoice') }}</p>
-                <a-select v-model="form.voice" :allow-search="true" @change="onChange('voice')">
+                <a-select v-model="form.voice" :allow-search="true" @change="onChange()">
                     <a-option v-for="voice in voiceList" :key="voice" :value="voice">{{ voice }}</a-option>
                 </a-select>
             </div>
 
             <div>
                 <p class="st-label">{{ t('TTSCONFIG_FormLabelPitch') }}</p>
-                <a-slider :min="-50" :max="50" show-input :show-tooltip="false" v-model="form.pitch" @change="onChange('pitch')" />
+                <a-slider :min="-50" :max="50" show-input :show-tooltip="false" v-model="form.pitch" @change="onChange()" />
             </div>
             <div>
                 <p class="st-label">{{ t('TTSCONFIG_FormLabelSpeed') }}</p>
-                <a-slider :min="-50" :max="50" show-input :show-tooltip="false" v-model="form.speed" @change="onChange('speed')" />
+                <a-slider :min="-50" :max="50" show-input :show-tooltip="false" v-model="form.speed" @change="onChange()" />
             </div>
             <div>
                 <p class="st-label">{{ t('TTSCONFIG_FormLabelWordsPerSection') }}</p>
-                <a-slider :min="100" :max="500" show-input :show-tooltip="false" v-model="form.wordsPerSection" @change="onChange('wordsPerSection')" />
+                <a-slider :min="100" :max="500" show-input :show-tooltip="false" v-model="form.wordsPerSection" @change="onChange()" />
             </div>
             <div>
                 <p class="st-label">{{ t('TTSCONFIG_OutputFormat') }}</p>
-                <a-select v-model="form.outputFormat" @change="onChange('outputFormat')">
+                <a-select v-model="form.outputFormat" @change="onChange()">
                     <a-option v-for="fmt in formats" :key="fmt" :value="fmt">{{ fmt }}</a-option>
                 </a-select>
             </div>
 
-            <a-button v-if="fileListStore.files.length > 0" long type="outline" @click="applyToAll">
-                <template #icon><i class="fa-sharp fa-light fa-arrow-down-to-line"></i></template>
+            <a-button v-if="fileListStore.files.length > 0" long type="primary" @click="applyToTargets">
                 {{ applyLabel }}
             </a-button>
         </div>
@@ -77,7 +61,7 @@
 import { ref, reactive, computed, watch, onMounted } from "vue";
 import { useTTSConfigStore, useFileListStore } from "../store";
 import { useI18n } from "vue-i18n";
-import { TTSConfig } from "../../global/types";
+import { ChapterTTSFields } from "../../global/types";
 import { edgeVoices, azureVoices } from "../../global/voices";
 
 const { t } = useI18n();
@@ -86,40 +70,45 @@ const fileListStore = useFileListStore();
 const isOpen = ref(true);
 
 const formats = ["m4b", "mp3", "m4a"];
-// Fields overridable per chapter. Azure key/region and concurrency are global
-// (edited in the settings modal), so they're excluded here.
-type ChapterField = "service" | "voice" | "pitch" | "speed" | "wordsPerSection" | "outputFormat";
+type ChapterField = keyof ChapterTTSFields;
 const chapterFields: ChapterField[] = ["service", "voice", "pitch", "speed", "wordsPerSection", "outputFormat"];
 
-const form = reactive<TTSConfig>({ ...ttsConfigStore.config });
+// The editor always represents a single "config to apply" — there is no
+// separate default vs. per-chapter distinction. It starts from the last
+// persisted values as a convenient baseline, and can be re-seeded from any
+// job's own config by clicking that job's TTS status icon in the queue.
+const form = reactive<ChapterTTSFields>(pickChapterFields(ttsConfigStore.config));
+const loadedFromFilename = ref<string | null>(null);
 
-const selectedFile = computed(() => fileListStore.getSelected);
-const voiceList = computed(() => (form.service === "azure" ? azureVoices : edgeVoices));
-
-function loadForm() {
-    const base = ttsConfigStore.config;
-    const effective = selectedFile.value?.useCustomTts && selectedFile.value.ttsConfig
-        ? { ...base, ...selectedFile.value.ttsConfig }
-        : base;
-    Object.assign(form, effective);
+function pickChapterFields(source: ChapterTTSFields): ChapterTTSFields {
+    const result = {} as ChapterTTSFields;
+    chapterFields.forEach((f) => ((result as Record<string, unknown>)[f] = source[f]));
+    return result;
 }
+
+const voiceList = computed(() => (form.service === "azure" ? azureVoices : edgeVoices));
 
 onMounted(async () => {
     await ttsConfigStore.loadConfigFromMain();
-    loadForm();
+    Object.assign(form, pickChapterFields(ttsConfigStore.config));
 });
 
-// Reload the form when a different chapter is selected, or the global default changes.
-watch(selectedFile, loadForm);
-watch(() => ttsConfigStore.config, () => { if (!selectedFile.value) loadForm(); }, { deep: true });
-
-function onChange(field: ChapterField) {
-    if (selectedFile.value) {
-        ttsConfigStore.updateFileTtsConfig(selectedFile.value.key, { [field]: form[field] } as Partial<TTSConfig>);
-    } else {
-        ttsConfigStore.updateConfig({ [field]: form[field] } as Partial<TTSConfig>);
-        ttsConfigStore.saveConfigToMain();
+// A job's TTS status icon requests this config be loaded for editing.
+watch(
+    () => fileListStore.ttsLoadNonce,
+    () => {
+        const file = fileListStore.ttsLoadKey ? fileListStore.getFileWithKey(fileListStore.ttsLoadKey) : undefined;
+        if (file?.ttsConfig) {
+            Object.assign(form, file.ttsConfig);
+            loadedFromFilename.value = file.filename;
+        }
     }
+);
+
+function onChange() {
+    loadedFromFilename.value = null;
+    ttsConfigStore.updateConfig(pickChapterFields(form));
+    ttsConfigStore.saveConfigToMain();
 }
 
 function setService(service: "edge" | "azure") {
@@ -127,8 +116,7 @@ function setService(service: "edge" | "azure") {
     form.service = service;
     // Reset the voice to a valid one for the new service.
     form.voice = (service === "azure" ? azureVoices : edgeVoices)[0];
-    onChange("service");
-    onChange("voice");
+    onChange();
 }
 
 const applyLabel = computed(() => {
@@ -136,17 +124,8 @@ const applyLabel = computed(() => {
     return n > 0 ? `${t("TTSCONFIG_ApplyToSelected")} (${n})` : t("TTSCONFIG_ApplyToAll");
 });
 
-function applyToAll() {
-    const override: Partial<TTSConfig> = {};
-    chapterFields.forEach((f) => ((override as Record<string, unknown>)[f] = form[f]));
-    fileListStore.applyTtsConfigToAll(override);
-}
-
-function resetToDefault() {
-    if (selectedFile.value) {
-        fileListStore.resetFileTtsConfig(selectedFile.value.key);
-        loadForm();
-    }
+function applyToTargets() {
+    fileListStore.applyTtsConfigToTargets(pickChapterFields(form));
 }
 </script>
 
@@ -154,7 +133,6 @@ function resetToDefault() {
 .st-scope {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     padding: 8px 10px;
     border-radius: 10px;
@@ -163,23 +141,5 @@ function resetToDefault() {
 }
 .st-scope i {
     color: var(--st-accent-soft);
-}
-.st-mini-btn {
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    border: 1px solid var(--st-border);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--st-text-2);
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.st-mini-btn:hover {
-    color: var(--st-text-1);
-}
-.st-divider {
-    height: 1px;
-    background: var(--st-border);
-    margin: 2px 0;
 }
 </style>

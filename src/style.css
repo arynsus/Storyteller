@@ -332,7 +332,7 @@ html body .arco-textarea-wrapper {
    which clash with this app's slate/violet palette. Re-point them at the same
    --st-* tokens the rest of the UI uses. */
 html body .arco-message {
-    align-items: flex-start;
+    align-items: center;
     gap: 4px;
     padding: 12px 16px;
     background: var(--st-bg-3);

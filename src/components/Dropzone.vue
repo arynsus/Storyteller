@@ -19,11 +19,9 @@
 </template>
 
 <script setup lang="ts">
-import wordsCount from "words-count";
 import { ref } from "vue";
 import { useFileListStore } from "../store";
-import { FileDataClass } from "../../global/types";
-import { analyzeMetadata } from "../../global/metadataAnalyzer";
+import { notify } from "../composables/notify";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -31,28 +29,43 @@ const fileListStore = useFileListStore();
 const fileInput = ref<HTMLInputElement>();
 const isDragging = ref(false);
 
-const handleFilesProcessing = (files: File[]) => {
-    files.forEach((file) => {
-        file.text().then((text) => {
-            const wordCount = wordsCount(text);
-            const fileData = new FileDataClass(file.name, file.name, (file as File & { path: string }).path, wordCount, analyzeMetadata(file.name));
-            if (!fileListStore.files.some((f) => f.key === fileData.key)) {
-                fileListStore.addFile(fileData);
-            }
-        });
-    });
+// Every dropped/selected file is copied into the app's working area (main
+// process) rather than referenced by its original path, so conversion and
+// the content editor only ever deal with one app-owned copy.
+const handleFilesProcessing = async (files: File[], rejectedCount: number) => {
+    if (rejectedCount > 0) {
+        notify.warning(`${rejectedCount} ${t("DROPZONE_NonTxtRejected")}`);
+    }
+    if (files.length > 0) {
+        const payload = await Promise.all(
+            files.map(async (file) => ({ filename: file.name, content: await file.text() }))
+        );
+        const res = await window.storyteller.importDroppedFiles(payload);
+        if (res.success && res.files) {
+            res.files.forEach((f) => fileListStore.addFile(f));
+        } else if (!res.success) {
+            notify.error(`${t("DROPZONE_ImportFailure")}${res.error}`);
+        }
+    }
     if (fileInput.value) fileInput.value.value = "";
+};
+
+const splitByExtension = (files: File[]): { accepted: File[]; rejectedCount: number } => {
+    const accepted = files.filter((file) => file.name.toLowerCase().endsWith(".txt"));
+    return { accepted, rejectedCount: files.length - accepted.length };
 };
 
 const handleDrop = (event: DragEvent) => {
     isDragging.value = false;
     const droppedFiles = Array.from(event.dataTransfer?.files || []);
-    handleFilesProcessing(droppedFiles.filter((file) => file.name.endsWith(".txt")));
+    const { accepted, rejectedCount } = splitByExtension(droppedFiles);
+    handleFilesProcessing(accepted, rejectedCount);
 };
 const handleFileInput = (event: Event) => {
     const files = (event.target as HTMLInputElement).files;
     if (files) {
-        handleFilesProcessing(Array.from(files).filter((file) => file.name.endsWith(".txt")));
+        const { accepted, rejectedCount } = splitByExtension(Array.from(files));
+        handleFilesProcessing(accepted, rejectedCount);
     }
 };
 const triggerFileInput = () => fileInput.value?.click();

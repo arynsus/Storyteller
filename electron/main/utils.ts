@@ -15,7 +15,11 @@ const wordsCount = (wordsCountModule as unknown as { default: (t: string) => num
 // (which also holds Chromium's own Blob Storage/Session Storage/etc.).
 const USER_DATA_PATH = app.getPath("userData");
 export const CONTENT_CACHE_DIR = path.join(USER_DATA_PATH, "content_cache");
-const CHAPTER_TXT_DIR = path.join(CONTENT_CACHE_DIR, "chapter_txt");
+// Shared working area for source text: both Chapter Maker output and files
+// dragged straight into the queue get copied here, so conversion and the
+// content editor always deal with one app-owned copy instead of juggling
+// original-file paths (which we must never mutate).
+const WORKING_TXT_DIR = path.join(CONTENT_CACHE_DIR, "working_txt");
 
 export const createDirIfNeeded = (dirPath: string): void => {
     if (!fs.existsSync(dirPath)) {
@@ -64,7 +68,7 @@ export const getDirectoryInfo = (dirPath: string): { size: number; count: number
     return { size, count };
 };
 
-clearDirectory(CHAPTER_TXT_DIR);
+clearDirectory(WORKING_TXT_DIR);
 
 function sanitizeFilename(name: string): string {
     return name.replace(/[\/\\:*?"<>|]/g, "").trim() || "chapter";
@@ -153,9 +157,9 @@ export const handleAddToList = async (
     chapters: ChapterPreview[]
 ): Promise<{ success: boolean; error?: string }> => {
     try {
-        createDirIfNeeded(CHAPTER_TXT_DIR);
+        createDirIfNeeded(WORKING_TXT_DIR);
         const fileList: FileData[] = chapters.map((chapter) => {
-            const filePath = path.join(CHAPTER_TXT_DIR, chapter.filename);
+            const filePath = path.join(WORKING_TXT_DIR, chapter.filename);
             fs.writeFileSync(filePath, chapter.content, "utf8");
             return new FileDataClass(
                 chapter.filename,
@@ -167,6 +171,79 @@ export const handleAddToList = async (
         });
         emitAddToList(fileList);
         return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+};
+
+/**
+ * Files dragged straight into the queue: copy their content into the same
+ * working area Chapter Maker uses, so every queued job is an app-owned copy
+ * and conversion/edit logic never has to special-case "the user's original
+ * file" vs "a chapter we generated".
+ */
+export const handleImportDroppedFiles = async (
+    _event: unknown,
+    incoming: { filename: string; content: string }[]
+): Promise<{ success: boolean; files?: FileData[]; error?: string }> => {
+    try {
+        createDirIfNeeded(WORKING_TXT_DIR);
+        const usedNames = new Set(fs.existsSync(WORKING_TXT_DIR) ? fs.readdirSync(WORKING_TXT_DIR) : []);
+        const fileList: FileData[] = incoming.map((item) => {
+            const stem = sanitizeFilename(item.filename.replace(/\.txt$/i, "")) || "untitled";
+            let candidate = `${stem}.txt`;
+            let suffix = 2;
+            while (usedNames.has(candidate)) {
+                candidate = `${stem}_${suffix++}.txt`;
+            }
+            usedNames.add(candidate);
+
+            const filePath = path.join(WORKING_TXT_DIR, candidate);
+            fs.writeFileSync(filePath, item.content, "utf8");
+            return new FileDataClass(
+                candidate,
+                candidate,
+                filePath,
+                wordsCount(item.content),
+                analyzeMetadata(candidate)
+            );
+        });
+        return { success: true, files: fileList };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+};
+
+function isInsideWorkingDir(filePath: string): boolean {
+    const resolved = path.resolve(filePath);
+    return resolved.startsWith(path.resolve(WORKING_TXT_DIR) + path.sep);
+}
+
+// Content editor: lazily load a queued chapter's text for viewing/editing.
+export const handleReadFileContent = async (
+    _event: unknown,
+    filePath: string
+): Promise<{ success: boolean; content?: string; error?: string }> => {
+    if (!isInsideWorkingDir(filePath)) return { success: false, error: "INVALID_PATH" };
+    try {
+        const content = await readFile(filePath, "utf8");
+        return { success: true, content };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+};
+
+// Content editor: persist edits back to the working-area copy (never the
+// user's original file) and report the recomputed word count.
+export const handleWriteFileContent = async (
+    _event: unknown,
+    filePath: string,
+    content: string
+): Promise<{ success: boolean; wordcount?: number; error?: string }> => {
+    if (!isInsideWorkingDir(filePath)) return { success: false, error: "INVALID_PATH" };
+    try {
+        fs.writeFileSync(filePath, content, "utf8");
+        return { success: true, wordcount: wordsCount(content) };
     } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : String(err) };
     }

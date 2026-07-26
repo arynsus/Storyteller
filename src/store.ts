@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { toRaw } from "vue";
-import { TTSConfig, FileData, MetadataConfig, resolveEffectiveConfig } from "../global/types";
+import { TTSConfig, FileData, MetadataConfig, ChapterTTSFields, resolveEffectiveConfig } from "../global/types";
 
 export type NotificationType = "success" | "error" | "warning" | "info";
 
@@ -98,12 +98,22 @@ export const useCacheInfoStore = defineStore("cacheinfo", {
 export const useFileListStore = defineStore("filelist", {
     state: () => ({
         files: [] as FileData[],
+        // "Load into editor" requests fired by clicking a row's status icon.
+        // A nonce (rather than just the key) makes re-clicking the same job's
+        // icon twice in a row still trigger a reload.
+        ttsLoadKey: null as string | null,
+        ttsLoadNonce: 0,
+        metadataLoadKey: null as string | null,
+        metadataLoadNonce: 0,
     }),
     getters: {
-        getSelected: (state) => state.files.find((file) => file.selected),
-        getFinished: (state) => state.files.filter((file) => file.finished),
         getChecked: (state) => state.files.filter((file) => file.checked),
         getFileWithKey: (state) => (key: string) => state.files.find((file) => file.key === key),
+        /** The single checked job, when exactly one is checked — drives the audio player. */
+        getSelected: (state) => {
+            const checked = state.files.filter((file) => file.checked);
+            return checked.length === 1 ? checked[0] : undefined;
+        },
     },
     actions: {
         addFile(file: FileData) {
@@ -123,10 +133,18 @@ export const useFileListStore = defineStore("filelist", {
         clearList() {
             this.files = [];
         },
-        toggleSelect(key: string) {
-            this.files = this.files.map((file) =>
-                file.key === key ? { ...file, selected: !file.selected } : { ...file, selected: false }
-            );
+        reorder(fromIndex: number, toIndex: number) {
+            const [moved] = this.files.splice(fromIndex, 1);
+            if (moved) this.files.splice(toIndex, 0, moved);
+        },
+        // ---- Selection: "checked" is the only selection concept in the UI ----
+        selectOnly(key: string) {
+            this.files.forEach((file) => (file.checked = file.key === key));
+        },
+        selectRange(fromIndex: number, toIndex: number) {
+            const start = Math.min(fromIndex, toIndex);
+            const end = Math.max(fromIndex, toIndex);
+            this.files.forEach((file, index) => (file.checked = index >= start && index <= end));
         },
         toggleChecked(key: string) {
             const file = this.files.find((f) => f.key === key);
@@ -140,18 +158,23 @@ export const useFileListStore = defineStore("filelist", {
             const checked = this.files.filter((f) => f.checked);
             return checked.length > 0 ? checked : this.files;
         },
+        // ---- "Load into editor" requests, fired from a row's status icon ----
+        requestTtsLoad(key: string) {
+            this.ttsLoadKey = key;
+            this.ttsLoadNonce++;
+        },
+        requestMetadataLoad(key: string) {
+            this.metadataLoadKey = key;
+            this.metadataLoadNonce++;
+        },
+        // ---- Metadata: book-level fields apply in bulk, chapter fields are per-job ----
         applyMetadataFieldsToTargets(fields: (keyof MetadataConfig)[], source: MetadataConfig) {
             this.bulkTargets().forEach((file) => {
+                if (!file.readyToStart) return;
                 if (!file.metadata) file.metadata = {};
                 fields.forEach((field) => {
                     file.metadata[field] = source[field];
                 });
-            });
-        },
-        applyMetadataToAll<T extends keyof MetadataConfig>(field: T, value: MetadataConfig[T]) {
-            this.bulkTargets().forEach((file) => {
-                if (!file.metadata) file.metadata = {};
-                file.metadata[field] = value;
             });
         },
         updateMetadata(key: string, metadata: Partial<MetadataConfig>) {
@@ -162,7 +185,7 @@ export const useFileListStore = defineStore("filelist", {
         },
         serializeChapterNumber(prefix: string) {
             let serialNumber = 1;
-            this.files.forEach((file) => {
+            this.bulkTargets().forEach((file) => {
                 if (file.readyToStart) {
                     if (!file.metadata) file.metadata = {};
                     file.metadata.chapterNumber = prefix + String(serialNumber);
@@ -170,28 +193,13 @@ export const useFileListStore = defineStore("filelist", {
                 }
             });
         },
-        // ---- Per-chapter TTS overrides (#3) ----
-        updateFileTtsConfig(key: string, partial: Partial<TTSConfig>) {
-            const file = this.files.find((f) => f.key === key);
-            if (file) {
-                file.ttsConfig = { ...(file.ttsConfig || {}), ...partial };
-                file.useCustomTts = true;
-            }
-        },
-        applyTtsConfigToAll(config: Partial<TTSConfig>) {
+        // ---- TTS: a job only becomes startable once a config has been applied ----
+        applyTtsConfigToTargets(config: ChapterTTSFields) {
             this.bulkTargets().forEach((file) => {
                 if (file.readyToStart) {
                     file.ttsConfig = { ...config };
-                    file.useCustomTts = true;
                 }
             });
-        },
-        resetFileTtsConfig(key: string) {
-            const file = this.files.find((f) => f.key === key);
-            if (file) {
-                file.ttsConfig = undefined;
-                file.useCustomTts = false;
-            }
         },
         effectiveConfig(key: string, globalConfig: TTSConfig): TTSConfig {
             const file = this.files.find((f) => f.key === key);
