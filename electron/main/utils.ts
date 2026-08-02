@@ -1,4 +1,5 @@
 import { app } from "electron";
+import crypto from "crypto";
 import fs from "fs";
 import { readFile } from "fs/promises";
 import path from "path";
@@ -6,77 +7,25 @@ import wordsCountModule from "words-count";
 import { FileDataClass, FileData, ChapterPreview, MakeChaptersResult } from "../../global/types";
 import { analyzeMetadata } from "../../global/metadataAnalyzer";
 import { emitAddToList } from "./emitter";
+import { WORKING_TXT_DIR, createDirIfNeeded, sanitizeFilename } from "./paths";
+import { recordJobCreated, recordWordcountByPath } from "./jobs";
 
 const wordsCount = (wordsCountModule as unknown as { default: (t: string) => number }).default ?? wordsCountModule;
 
-// Set up directories. Everything Storyteller generates lives under one
-// content_cache folder so users can find (and clear) it in a single place,
-// instead of hunting through loose folders in the Electron userData root
-// (which also holds Chromium's own Blob Storage/Session Storage/etc.).
-const USER_DATA_PATH = app.getPath("userData");
-export const CONTENT_CACHE_DIR = path.join(USER_DATA_PATH, "content_cache");
-// Shared working area for source text: both Chapter Maker output and files
-// dragged straight into the queue get copied here, so conversion and the
-// content editor always deal with one app-owned copy instead of juggling
-// original-file paths (which we must never mutate).
-const WORKING_TXT_DIR = path.join(CONTENT_CACHE_DIR, "working_txt");
-
-export const createDirIfNeeded = (dirPath: string): void => {
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-};
-
-export const clearDirectory = (dirPath: string): string[] => {
-    const removedFiles: string[] = [];
-    try {
-        if (fs.existsSync(dirPath)) {
-            for (const file of fs.readdirSync(dirPath)) {
-                fs.unlinkSync(path.join(dirPath, file));
-                removedFiles.push(file);
-            }
-        }
-    } catch (err) {
-        console.error(`Error clearing directory ${dirPath}:`, err);
-    }
-    return removedFiles;
-};
-
-// Recurses into subdirectories so a parent folder (e.g. content_cache) reports
-// the combined size/count of everything nested under it.
-export const getDirectoryInfo = (dirPath: string): { size: number; count: number } => {
-    let size = 0;
-    let count = 0;
-    try {
-        if (fs.existsSync(dirPath)) {
-            for (const entry of fs.readdirSync(dirPath)) {
-                const entryPath = path.join(dirPath, entry);
-                const stat = fs.statSync(entryPath);
-                if (stat.isDirectory()) {
-                    const nested = getDirectoryInfo(entryPath);
-                    size += nested.size;
-                    count += nested.count;
-                } else if (stat.isFile()) {
-                    size += stat.size;
-                    count++;
-                }
-            }
-        }
-    } catch (err) {
-        console.error(`Error reading directory ${dirPath}:`, err);
-    }
-    return { size, count };
-};
-
-clearDirectory(WORKING_TXT_DIR);
-
-function sanitizeFilename(name: string): string {
-    return name.replace(/[\/\\:*?"<>|]/g, "").trim() || "chapter";
+/**
+ * Working-text filenames carry the chapter's name for anyone browsing the cache
+ * folder, plus a slice of the job id so two chapters that happen to share a
+ * title can't collide. The id — not the name — is what the manifest keys on.
+ */
+function workingTxtPathFor(displayName: string, jobId: string): string {
+    const stem = sanitizeFilename(displayName.replace(/\.txt$/i, "")) || "chapter";
+    return path.join(WORKING_TXT_DIR, `${stem}__${jobId.slice(0, 8)}.txt`);
 }
 
 /**
- * Chapter Maker: split monolithic text into chapters *in memory* and return a
- * preview. No files are written until the user commits via `handleAddToList`.
+ * Regex-based chapter splitting (Ebook Loader's Regex Split mode): split
+ * monolithic text into chapters *in memory* and return a preview. No files
+ * are written until the user commits via `handleAddToList`.
  */
 export const handleMakeChapters = async (
     _event: unknown,
@@ -159,15 +108,20 @@ export const handleAddToList = async (
     try {
         createDirIfNeeded(WORKING_TXT_DIR);
         const fileList: FileData[] = chapters.map((chapter) => {
-            const filePath = path.join(WORKING_TXT_DIR, chapter.filename);
+            const jobId = crypto.randomUUID();
+            const filePath = workingTxtPathFor(chapter.filename, jobId);
             fs.writeFileSync(filePath, chapter.content, "utf8");
-            return new FileDataClass(
-                chapter.filename,
-                chapter.filename,
-                filePath,
-                chapter.wordcount,
-                analyzeMetadata(chapter.filename)
-            );
+            const metadata = analyzeMetadata(chapter.filename);
+            recordJobCreated({
+                jobId,
+                filename: chapter.filename,
+                workingTxtPath: filePath,
+                wordcount: chapter.wordcount,
+                metadata,
+            });
+            // The job id doubles as the queue key: two chapters may legitimately
+            // share a title, and rows must still be addressable one by one.
+            return new FileDataClass(jobId, jobId, chapter.filename, filePath, chapter.wordcount, metadata);
         });
         emitAddToList(fileList);
         return { success: true };
@@ -178,7 +132,7 @@ export const handleAddToList = async (
 
 /**
  * Files dragged straight into the queue: copy their content into the same
- * working area Chapter Maker uses, so every queued job is an app-owned copy
+ * working area Ebook Loader uses, so every queued job is an app-owned copy
  * and conversion/edit logic never has to special-case "the user's original
  * file" vs "a chapter we generated".
  */
@@ -188,25 +142,15 @@ export const handleImportDroppedFiles = async (
 ): Promise<{ success: boolean; files?: FileData[]; error?: string }> => {
     try {
         createDirIfNeeded(WORKING_TXT_DIR);
-        const usedNames = new Set(fs.existsSync(WORKING_TXT_DIR) ? fs.readdirSync(WORKING_TXT_DIR) : []);
         const fileList: FileData[] = incoming.map((item) => {
-            const stem = sanitizeFilename(item.filename.replace(/\.txt$/i, "")) || "untitled";
-            let candidate = `${stem}.txt`;
-            let suffix = 2;
-            while (usedNames.has(candidate)) {
-                candidate = `${stem}_${suffix++}.txt`;
-            }
-            usedNames.add(candidate);
-
-            const filePath = path.join(WORKING_TXT_DIR, candidate);
+            const candidate = `${sanitizeFilename(item.filename.replace(/\.txt$/i, "")) || "untitled"}.txt`;
+            const jobId = crypto.randomUUID();
+            const filePath = workingTxtPathFor(candidate, jobId);
             fs.writeFileSync(filePath, item.content, "utf8");
-            return new FileDataClass(
-                candidate,
-                candidate,
-                filePath,
-                wordsCount(item.content),
-                analyzeMetadata(candidate)
-            );
+            const wordcount = wordsCount(item.content);
+            const metadata = analyzeMetadata(candidate);
+            recordJobCreated({ jobId, filename: candidate, workingTxtPath: filePath, wordcount, metadata });
+            return new FileDataClass(jobId, jobId, candidate, filePath, wordcount, metadata);
         });
         return { success: true, files: fileList };
     } catch (err) {
@@ -243,24 +187,11 @@ export const handleWriteFileContent = async (
     if (!isInsideWorkingDir(filePath)) return { success: false, error: "INVALID_PATH" };
     try {
         fs.writeFileSync(filePath, content, "utf8");
-        return { success: true, wordcount: wordsCount(content) };
+        const wordcount = wordsCount(content);
+        recordWordcountByPath(filePath, wordcount);
+        return { success: true, wordcount };
     } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-};
-
-// Load audio for result preview -> returns a data URL the renderer can play.
-export const handleAudioLoad = async (
-    _event: unknown,
-    audioUrl: string
-): Promise<{ success: boolean; dataUrl?: string }> => {
-    try {
-        const data = await readFile(audioUrl);
-        const ext = path.extname(audioUrl).replace(".", "") || "mp3";
-        const mime = ext === "m4b" || ext === "m4a" ? "audio/mp4" : "audio/mpeg";
-        return { success: true, dataUrl: `data:${mime};base64,${data.toString("base64")}` };
-    } catch {
-        return { success: false };
     }
 };
 

@@ -8,7 +8,19 @@ import wordsCountModule from "words-count";
 import { edgeTextToSpeech } from "./edge";
 import { azureTextToSpeech } from "./azure";
 import { FileData, TTSConfig, MetadataConfig, resolveEffectiveConfig } from "../../global/types";
-import { clearDirectory, createDirIfNeeded, CONTENT_CACHE_DIR } from "./utils";
+import {
+    AUDIO_OUTPUT_DIR,
+    AUDIO_SECTIONS_DIR,
+    COVER_ART_DIR,
+    createDirIfNeeded,
+} from "./paths";
+import {
+    activeJobIds,
+    recordCoverArt,
+    recordJobComplete,
+    recordJobFailed,
+    recordJobStarted,
+} from "./jobs";
 import { emitConversionEvent, emitError } from "./emitter";
 
 const wordsCount = (wordsCountModule as unknown as { default: (t: string) => number }).default ?? wordsCountModule;
@@ -22,29 +34,11 @@ process.env.FFMPEG_PATH = ffmpegBin.path;
 const ffprobeBin = require("ffprobe-static-electron");
 process.env.FFPROBE_PATH = ffprobeBin.path;
 
-// Set up directories
 const USER_DATA_PATH = app.getPath("userData");
-const AUDIO_SECTIONS_DIR = path.join(CONTENT_CACHE_DIR, "audio_sections");
-const COVER_ART_DIR = path.join(CONTENT_CACHE_DIR, "cover_arts");
-export const AUDIO_OUTPUT_DIR = path.join(CONTENT_CACHE_DIR, "audio_output");
-clearDirectory(AUDIO_SECTIONS_DIR);
-clearDirectory(COVER_ART_DIR);
 
-// Manual "Clear Cache" only removes what's always safe to delete: finished
-// output and the (already-embedded, never revisited) cover art copies. Split
-// section files and Chapter Maker source text are left alone since they may
-// back an in-progress conversion or a still-queued, unconverted chapter.
-export function clearFinishedOutputCache(): number {
-    const removedOutput = clearDirectory(AUDIO_OUTPUT_DIR);
-    const removedCoverArt = clearDirectory(COVER_ART_DIR);
-    return removedOutput.length + removedCoverArt.length;
-}
-
-// Guard against two conversion runs processing the same file at once (e.g. the
-// user clicks "Convert" again before the previous run finished). Without this
-// the two runs would each emit progress for the same sections and the counter
-// could exceed the total (the "57/55" bug).
-const activeJobs = new Set<string>();
+// Nothing is wiped at startup any more: section files left by an interrupted
+// run are what lets that job resume instead of re-paying for TTS, and the
+// History tab is now responsible for clearing them when the user says so.
 
 // Receive a list of files to convert, send to queue.
 export const handleFileConversion = async (
@@ -74,33 +68,56 @@ const asyncQueue = async (tasks: Array<() => Promise<void>>, concurrencyLimit: n
 };
 
 const processFile = async (file: FileData, globalConfig: TTSConfig): Promise<void> => {
-    if (activeJobs.has(file.filename)) {
-        return; // already being processed by another run
+    // Guard against two runs processing the same job at once (e.g. the user
+    // clicks "Convert" again before the previous run finished). Without this
+    // both runs emit progress for the same sections and the counter can exceed
+    // the total (the "57/55" bug).
+    if (activeJobIds.has(file.jobId)) {
+        return;
     }
-    activeJobs.add(file.filename);
+
+    const { jobId, filename } = file;
+    const sectionsDir = path.join(AUDIO_SECTIONS_DIR, jobId);
+    const config = resolveEffectiveConfig(globalConfig, file);
+
+    recordJobStarted({
+        jobId,
+        filename,
+        workingTxtPath: file.path,
+        sectionsDir,
+        wordcount: file.wordcount,
+        metadata: file.metadata,
+        ttsConfig: {
+            service: config.service,
+            voice: config.voice,
+            pitch: config.pitch,
+            speed: config.speed,
+            wordsPerSection: config.wordsPerSection,
+            outputFormat: config.outputFormat,
+        },
+    });
 
     try {
-        const config = resolveEffectiveConfig(globalConfig, file);
+        createDirIfNeeded(sectionsDir);
         const text = fs.readFileSync(file.path, "utf8");
         const sections = divideTextIntoSections(text, config.wordsPerSection);
 
-        emitConversionEvent({ type: "split-start", filename: file.filename });
-        emitConversionEvent({ type: "split-complete", filename: file.filename, totalSections: sections.length });
+        emitConversionEvent({ type: "split-start", jobId, filename });
+        emitConversionEvent({ type: "split-complete", jobId, filename, totalSections: sections.length });
 
         // Authoritative progress: track which section indices are done rather than
-        // counting events. Pre-seed with sections already cached on disk so a
-        // resumed job reports the correct starting point.
+        // counting events. Pre-seed with sections already cached on disk so a job
+        // resumed after a crash reports the correct starting point.
         const completed = new Set<number>();
-        const sectionPaths = sections.map((_, index) =>
-            path.join(AUDIO_SECTIONS_DIR, `${sanitizeFilename(file.filename)}_${index}.mp3`)
-        );
+        const sectionPaths = sections.map((_, index) => path.join(sectionsDir, `${index}.mp3`));
         sectionPaths.forEach((p, index) => {
-            if (fs.existsSync(p)) completed.add(index);
+            if (fs.existsSync(p) && fs.statSync(p).size > 0) completed.add(index);
         });
         const emitProgress = () =>
             emitConversionEvent({
                 type: "conversion-progress",
-                filename: file.filename,
+                jobId,
+                filename,
                 finishedSections: Math.min(completed.size, sections.length),
                 totalSections: sections.length,
             });
@@ -118,11 +135,14 @@ const processFile = async (file: FileData, globalConfig: TTSConfig): Promise<voi
         try {
             await asyncQueue(sectionTasks, Math.max(1, config.sectionConcurrencyLimit));
         } catch (err) {
-            emitError(err, file.filename);
+            // The sections that did land stay on disk: History lists this job as
+            // unfinished, and re-running it picks up where this run stopped.
+            recordJobFailed(jobId, err instanceof Error ? err.message : String(err));
+            emitError(err, jobId, filename);
             return; // stop before combining
         }
 
-        emitConversionEvent({ type: "combine-start", filename: file.filename });
+        emitConversionEvent({ type: "combine-start", jobId, filename });
         const sectionFiles = sectionPaths.map((p, index) => ({ index, path: p }));
         const outputFilePath = path.join(
             AUDIO_OUTPUT_DIR,
@@ -130,19 +150,32 @@ const processFile = async (file: FileData, globalConfig: TTSConfig): Promise<voi
         );
 
         try {
-            await combineSectionFiles(sectionFiles, outputFilePath, file.metadata);
-            emitConversionEvent({ type: "combine-complete", filename: file.filename, url: outputFilePath });
+            await combineSectionFiles(sectionFiles, sectionsDir, outputFilePath, file.metadata, { jobId, filename });
+            recordJobComplete(jobId, outputFilePath, await probeDuration(outputFilePath));
+            emitConversionEvent({ type: "combine-complete", jobId, filename, url: outputFilePath });
         } catch (err) {
-            emitError(err, file.filename);
+            recordJobFailed(jobId, err instanceof Error ? err.message : String(err));
+            emitError(err, jobId, filename);
         }
+    } catch (err) {
+        recordJobFailed(jobId, err instanceof Error ? err.message : String(err));
+        emitError(err, jobId, filename);
     } finally {
-        activeJobs.delete(file.filename);
+        activeJobIds.delete(jobId);
     }
 };
 
 function sanitizeFilename(name: string): string {
     return name.replace(/[\/\\:*?"<>|]/g, "_");
 }
+
+/** Playback length of the finished file, so History can show it without re-probing. */
+const probeDuration = (filePath: string): Promise<number | undefined> =>
+    new Promise((resolve) => {
+        ffmpeg.ffprobe(filePath, (err: Error | null, data: { format?: { duration?: number } }) => {
+            resolve(err ? undefined : data?.format?.duration);
+        });
+    });
 
 function formatOutputFilename(file: FileData): string {
     const { bookTitle, chapterTitle, chapterNumber } = file.metadata;
@@ -210,8 +243,10 @@ const convertSectionToMP3 = async (
 // All sections are combined into one file of the chosen format.
 const combineSectionFiles = async (
     sectionFiles: { index: number; path: string }[],
+    sectionsDir: string,
     outputFile: string,
-    metadata: MetadataConfig
+    metadata: MetadataConfig,
+    job: { jobId: string; filename: string }
 ): Promise<void> => {
     const command = ffmpeg();
 
@@ -245,14 +280,20 @@ const combineSectionFiles = async (
             .mergeToFile(outputFile, path.join(USER_DATA_PATH, "temp"));
     });
 
-    // Cleanup section files.
+    // Cleanup section files: once combined they're dead weight, and the job's
+    // History entry now points at the finished audio instead.
     sectionFiles.forEach(({ path: sectionPath }) => {
         if (fs.existsSync(sectionPath)) fs.unlinkSync(sectionPath);
     });
+    try {
+        if (fs.existsSync(sectionsDir) && fs.readdirSync(sectionsDir).length === 0) fs.rmdirSync(sectionsDir);
+    } catch {
+        /* a concurrent write can repopulate it; harmless either way */
+    }
 
     // Add cover art via a direct ffmpeg call (fluent-ffmpeg can't embed it well).
     if (metadata.coverArt) {
-        const coverArtPath = await getCoverArt(metadata.coverArt, outputFile);
+        const coverArtPath = await getCoverArt(metadata.coverArt, job);
         if (coverArtPath) {
             const tempFile = `${outputFile}.temp${path.extname(outputFile)}`;
             const isMp3 = path.extname(outputFile).toLowerCase() === ".mp3";
@@ -277,8 +318,13 @@ const combineSectionFiles = async (
     }
 };
 
-// Cover art can be downloaded or loaded from the local machine.
-const getCoverArt = async (coverArtPathOrUrl: string, filename: string): Promise<string | null> => {
+// Cover art can be downloaded or loaded from the local machine. The normalized
+// copy is kept (keyed by job) so History can show the book's cover without
+// re-reading the audio file's embedded artwork.
+const getCoverArt = async (
+    coverArtPathOrUrl: string,
+    job: { jobId: string; filename: string }
+): Promise<string | null> => {
     if (!coverArtPathOrUrl) return null;
 
     try {
@@ -296,11 +342,12 @@ const getCoverArt = async (coverArtPathOrUrl: string, filename: string): Promise
             buffer = await sharp(buffer).jpeg().toBuffer();
         }
         createDirIfNeeded(COVER_ART_DIR);
-        const outputPath = path.join(COVER_ART_DIR, `${crypto.randomUUID()}.jpg`);
+        const outputPath = path.join(COVER_ART_DIR, `${job.jobId}.jpg`);
         await sharp(buffer).toFile(outputPath);
+        recordCoverArt(job.jobId, outputPath);
         return outputPath;
     } catch {
-        emitConversionEvent({ type: "cover-art-unavailable", filename });
+        emitConversionEvent({ type: "cover-art-unavailable", ...job });
         return null;
     }
 };

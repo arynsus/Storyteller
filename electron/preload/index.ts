@@ -28,7 +28,7 @@ const api: StorytellerAPI = {
     makeChapters: (content: string, pattern: string, flags: string) =>
         ipcRenderer.invoke("make-chapters", content, pattern, flags),
     addToList: (chapters: ChapterPreview[]) => ipcRenderer.invoke("add-to-list", chapters),
-    loadAudio: (url: string) => ipcRenderer.invoke("load-audio", url),
+    loadEbook: (filePath: string) => ipcRenderer.invoke("load-ebook", filePath),
     importDroppedFiles: (files: { filename: string; content: string }[]) =>
         ipcRenderer.invoke("import-dropped-files", files),
     readFileContent: (path: string) => ipcRenderer.invoke("read-file-content", path),
@@ -37,17 +37,25 @@ const api: StorytellerAPI = {
     downloadFiles: (paths: string[]) => ipcRenderer.invoke("download-files", paths),
     changeLanguage: (language: string) => ipcRenderer.invoke("change-language", language),
     testVoices: () => ipcRenderer.invoke("test-voices"),
-    clearOutputCache: () => ipcRenderer.invoke("clear-output-cache"),
-    getOutputCacheInfo: () => ipcRenderer.invoke("get-output-cache-info"),
-    openOutputCacheFolder: () => ipcRenderer.invoke("open-output-cache-folder"),
-    openWindow: (name: "chapter-maker" | "voice-tester") => ipcRenderer.invoke("open-window", name),
+    openWindow: (name: "voice-tester") => ipcRenderer.invoke("open-window", name),
+
+    // history / cache
+    listJobs: () => ipcRenderer.invoke("list-jobs"),
+    freeJobsCache: (jobIds: string[]) => ipcRenderer.invoke("free-jobs-cache", jobIds),
+    deleteJobs: (jobIds: string[]) => ipcRenderer.invoke("delete-jobs", jobIds),
+    clearOrphanCache: () => ipcRenderer.invoke("clear-orphan-cache"),
+    getCacheInfo: () => ipcRenderer.invoke("get-cache-info"),
+    openCacheFolder: () => ipcRenderer.invoke("open-cache-folder"),
+    // Synchronous by design: it only builds a URL the main process will serve.
+    cacheFileUrl: (filePath: string) => `st-cache://media?p=${encodeURIComponent(filePath)}`,
 
     // push events
     onConversionEvent: (cb: (event: ConversionEvent) => void) => subscribe("conversion-event", cb),
     onAddToList: (cb: (files: FileData[]) => void) => subscribe("add-to-list", cb),
     onLanguageChange: (cb: (language: string) => void) => subscribe("change-language", cb),
     onVoiceTestEvent: (cb: (event: VoiceTestEvent) => void) => subscribe("voice-test-event", cb),
-    onOutputCacheCleared: (cb: (removed: number) => void) => subscribe("output-cache-cleared", cb),
+    onHistoryChanged: (cb: () => void) => subscribe("history-changed", cb),
+    onOpenHistory: (cb: () => void) => subscribe("open-history", cb),
 };
 
 contextBridge.exposeInMainWorld("storyteller", api);

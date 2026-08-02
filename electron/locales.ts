@@ -1,11 +1,10 @@
 const locales = {
     en: {
         "File": "File",
-        "ClearOutputCache": "Clear Output Cache",
+        "OpenHistory": "History & Cache",
         "Edit": "Edit",
         "View": "View",
         "Window": "Window",
-        "ChapterMaker": "Chapter Maker",
         "Help": "Help",
         "GithubRepo": "Github Repo",
         "About": "About",
@@ -40,11 +39,10 @@ const locales = {
     },
     zh: {
         "File": "文件",
-        "ClearOutputCache": "清除输出缓存",
+        "OpenHistory": "历史与缓存",
         "Edit": "编辑",
         "View": "查看",
         "Window": "窗口",
-        "ChapterMaker": "章节切割器",
         "Help": "帮助",
         "GithubRepo": "Github 仓库",
         "About": "关于",
@@ -79,11 +77,10 @@ const locales = {
     },    
     es: {
         "File": "Archivo",
-        "ClearOutputCache": "Limpiar caché de salida",
+        "OpenHistory": "Historial y caché",
         "Edit": "Editar",
         "View": "Ver",
         "Window": "Ventana",
-        "ChapterMaker": "Creador de Capítulos",
         "Help": "Ayuda",
         "GithubRepo": "Repositorio en Github",
         "About": "Acerca de",

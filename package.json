@@ -1,6 +1,6 @@
 {
   "name": "storyteller",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "main": "dist-electron/main/index.js",
   "description": "Convert text novel to audiobook via Edge's TTS.",
   "author": "Arynsus Mirhardt",
@@ -43,12 +43,15 @@
   },
   "dependencies": {
     "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
     "chinese-numbers-converter": "^2.3.1",
     "electron-log": "^5.0.0",
+    "fast-xml-parser": "^4.5.1",
     "ffmpeg-static-electron": "^2.0.3",
     "ffprobe-static-electron": "^2.0.2",
     "file-type": "^18.7.0",
     "fluent-ffmpeg": "^2.1.2",
+    "jszip": "^3.10.1",
     "node-fetch": "^3.3.2",
     "pinia": "^2.1.7",
     "sharp": "^0.32.6",

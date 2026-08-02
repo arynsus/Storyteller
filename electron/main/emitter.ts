@@ -22,11 +22,16 @@ export function emitVoiceTestEvent(event: VoiceTestEvent): void {
     broadcast("voice-test-event", event);
 }
 
-export function emitError(error: unknown, filename?: string): void {
+export function emitError(error: unknown, jobId?: string, filename?: string): void {
     const message = error instanceof Error ? error.message : String(error);
-    broadcast("conversion-event", { type: "error", error: message, filename });
+    broadcast("conversion-event", { type: "error", error: message, jobId, filename });
 }
 
 export function emitAddToList(files: FileData[]): void {
     broadcast("add-to-list", files);
+}
+
+/** The job manifest changed; History should re-read it. */
+export function emitHistoryChanged(): void {
+    broadcast("history-changed", null);
 }

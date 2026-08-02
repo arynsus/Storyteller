@@ -415,7 +415,13 @@ const convertTooltip = computed(() => {
     return "";
 });
 
-const clearList = () => fileListStore.clearList();
+// Clearing the queue discards the chapters that never produced audio, cache and
+// all — finished ones keep their audio and stay in History.
+async function clearList() {
+    const discardable = fileListStore.files.filter((file) => !file.finished).map((file) => file.jobId);
+    fileListStore.clearList();
+    if (discardable.length > 0) await window.storyteller.deleteJobs(discardable);
+}
 
 // ---- download the audio of selected, finished chapters ----
 const checkedFinishedFiles = computed(() => fileListStore.files.filter((f) => f.checked && f.finished));
@@ -460,13 +466,14 @@ onUnmounted(() => {
 });
 
 function handleConversionEvent(res: ConversionEvent) {
-    if (res.type === "error" && !res.filename) {
+    if (res.type === "error" && !res.jobId) {
         notify.error(`${t("MESSAGE_SystemMalfunction")} ${res.error}`, 5000);
         return;
     }
 
-    const filename = "filename" in res ? res.filename : undefined;
-    const entry = fileListStore.files.find((e) => e.filename === filename);
+    // Events are addressed by job id: two chapters can share a filename, and a
+    // row must only ever be updated by its own conversion.
+    const entry = res.jobId ? fileListStore.getFileWithKey(res.jobId) : undefined;
     if (!entry) return;
 
     switch (res.type) {
@@ -550,7 +557,12 @@ function calculateProgress(file: FileData): number {
     return 0;
 }
 
-const removeFile = (file: FileData) => fileListStore.removeFile(file.key);
+// Only unconverted rows expose this button, so removing one is a discard: the
+// working text goes with it instead of lingering as untracked cache.
+const removeFile = async (file: FileData) => {
+    fileListStore.removeFile(file.key);
+    await window.storyteller.deleteJobs([file.jobId]);
+};
 
 const downloadFile = async (url?: string) => {
     if (!url) return;

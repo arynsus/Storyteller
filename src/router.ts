@@ -1,7 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import MainWindow from './views/MainWindow.vue'; 
-import ChapterMakerWindow from './views/ChapterMakerWindow.vue'; 
-import VoiceTesterWindow from './views/VoiceTesterWindow.vue'; 
+import MainWindow from './views/MainWindow.vue';
+import VoiceTesterWindow from './views/VoiceTesterWindow.vue';
 import { i18n } from './main';
 
 const routes = [
@@ -11,14 +10,6 @@ const routes = [
     component: MainWindow,
     meta: {
       titleKey: "MAINWINDOW_Title"
-    }
-  },
-  {
-    path: '/chapter-maker',
-    name: 'ChapterMakerWindow',
-    component: ChapterMakerWindow,
-    meta: {
-      titleKey: "CHAPTERMAKER_Title"
     }
   },
   {

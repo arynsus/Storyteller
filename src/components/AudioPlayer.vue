@@ -48,18 +48,18 @@ function reset() {
     isPlaying.value = false;
 }
 
+// Streamed from the main process rather than inlined as base64: an m4b chapter
+// can be hundreds of megabytes, and this way seeking doesn't wait on a full read.
 watch(
     () => fileListStore.getSelected,
-    async (selectedFile) => {
+    (selectedFile) => {
         reset();
         if (selectedFile?.url) {
-            const res = await window.storyteller.loadAudio(selectedFile.url);
-            if (res.success && res.dataUrl) {
-                const el = new Audio(res.dataUrl);
-                el.addEventListener("timeupdate", updateProgress);
-                el.addEventListener("ended", () => (isPlaying.value = false));
-                audio.value = el;
-            }
+            const el = new Audio(window.storyteller.cacheFileUrl(selectedFile.url));
+            el.addEventListener("timeupdate", updateProgress);
+            el.addEventListener("loadedmetadata", updateProgress);
+            el.addEventListener("ended", () => (isPlaying.value = false));
+            audio.value = el;
         }
     }
 );

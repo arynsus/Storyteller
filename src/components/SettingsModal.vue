@@ -44,7 +44,8 @@
                     <p class="st-label">{{ t('SETTINGS_CacheThresholdLabel') }}</p>
                     <a-input-number
                         :min="1"
-                        :max="10000"
+                        :max="500000"
+                        :step="500"
                         v-model="config.cacheClearThresholdMB"
                         @change="save"
                     >

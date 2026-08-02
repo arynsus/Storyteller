@@ -1,20 +1,28 @@
-import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions } from "electron";
+import { app, BrowserWindow, shell, ipcMain, Menu, MenuItemConstructorOptions, protocol } from "electron";
 import path from "node:path";
 import fs from "fs";
-import { handleFileConversion, clearFinishedOutputCache } from "./tts";
+import { Readable } from "stream";
+import { handleFileConversion } from "./tts";
 import {
     handleMakeChapters,
     handleAddToList,
-    handleAudioLoad,
     handleFileDownload,
     handleAllFilesDownload,
     handleImportDroppedFiles,
     handleReadFileContent,
     handleWriteFileContent,
-    getDirectoryInfo,
-    createDirIfNeeded,
-    CONTENT_CACHE_DIR,
 } from "./utils";
+import { createDirIfNeeded, CONTENT_CACHE_DIR } from "./paths";
+import {
+    clearOrphanCache,
+    deleteJobs,
+    flushJobs,
+    freeJobsCache,
+    getCacheInfo,
+    getSnapshot,
+    loadJobs,
+} from "./jobs";
+import { handleLoadEbook } from "./ebook";
 import { testVoiceAvailability } from "./edge";
 import locales from "../locales";
 import { TTSConfig } from "../../global/types";
@@ -107,11 +115,10 @@ function getMenuTemplate(locale: (typeof locales)[keyof typeof locales]): MenuIt
             label: locale.File,
             submenu: [
                 {
-                    label: locale.ClearOutputCache,
-                    click: () => {
-                        const removed = clearFinishedOutputCache();
-                        win?.webContents.send("output-cache-cleared", removed);
-                    },
+                    // Cache is managed per job in History now, so the menu opens
+                    // that tab rather than offering a second, blunter clear-all.
+                    label: locale.OpenHistory,
+                    click: () => win?.webContents.send("open-history"),
                 },
                 { type: "separator" },
                 isMac ? { role: "close", label: locale.Close } : { role: "quit", label: locale.Quit },
@@ -164,7 +171,6 @@ function getMenuTemplate(locale: (typeof locales)[keyof typeof locales]): MenuIt
         {
             label: locale.Window,
             submenu: [
-                { label: locale.ChapterMaker, click: () => createChapterMakerWindow() },
                 { label: locale.VoiceTester, click: () => createVoiceTesterWindow() },
                 { type: "separator" },
                 { role: "minimize", label: locale.Minimize },
@@ -243,12 +249,98 @@ function createChildWindow(hash: string, title: string): void {
     }
 }
 
-const createChapterMakerWindow = () => createChildWindow("chapter-maker", "Chapter Maker");
 const createVoiceTesterWindow = () => createChildWindow("voice-tester", "Voice Tester");
+
+// ---------------------------------------------------------------------------
+// st-cache:// — streams files out of content_cache to the renderer
+//
+// A finished audiobook chapter can be hundreds of megabytes, so History (and
+// the queue's player) can't inline it as a base64 data URL. This serves the
+// file straight off disk with Range support, which is also what lets the user
+// drag the scrubber without downloading the whole thing first. Cover art rides
+// the same scheme so History can show thumbnails.
+// ---------------------------------------------------------------------------
+
+const CACHE_SCHEME = "st-cache";
+
+protocol.registerSchemesAsPrivileged([
+    { scheme: CACHE_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+]);
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+    ".m4b": "audio/mp4",
+    ".m4a": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+};
+
+function registerCacheProtocol(): void {
+    protocol.handle(CACHE_SCHEME, async (request) => {
+        let filePath: string;
+        try {
+            filePath = path.resolve(decodeURIComponent(new URL(request.url).searchParams.get("p") ?? ""));
+        } catch {
+            return new Response(null, { status: 400 });
+        }
+
+        // Never serve anything outside the app's own cache, whatever the renderer asks for.
+        if (!filePath.startsWith(path.resolve(CONTENT_CACHE_DIR) + path.sep)) {
+            return new Response(null, { status: 403 });
+        }
+
+        let size: number;
+        try {
+            size = fs.statSync(filePath).size;
+        } catch {
+            return new Response(null, { status: 404 });
+        }
+
+        const contentType = MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()] ?? "application/octet-stream";
+        const rangeHeader = request.headers.get("Range");
+        const match = rangeHeader?.match(/bytes=(\d*)-(\d*)/);
+
+        if (match) {
+            const start = match[1] ? Number(match[1]) : 0;
+            const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+            if (!Number.isFinite(start) || start >= size || end < start) {
+                return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+            }
+            const stream = Readable.toWeb(fs.createReadStream(filePath, { start, end })) as ReadableStream;
+            return new Response(stream, {
+                status: 206,
+                headers: {
+                    "Content-Type": contentType,
+                    "Content-Length": String(end - start + 1),
+                    "Content-Range": `bytes ${start}-${end}/${size}`,
+                    "Accept-Ranges": "bytes",
+                },
+            });
+        }
+
+        const stream = Readable.toWeb(fs.createReadStream(filePath)) as ReadableStream;
+        return new Response(stream, {
+            status: 200,
+            headers: {
+                "Content-Type": contentType,
+                "Content-Length": String(size),
+                "Accept-Ranges": "bytes",
+            },
+        });
+    });
+}
 
 // ---------------------------------------------------------------------------
 // TTS config persistence
 // ---------------------------------------------------------------------------
+
+/** Pre-History default, when the threshold only counted clearable output. */
+const LEGACY_CACHE_THRESHOLD_MB = 50;
+/** Now that finished audiobooks count too, the warning is about a large library. */
+const DEFAULT_CACHE_THRESHOLD_MB = 5000;
 
 const DEFAULT_CONFIG: TTSConfig = {
     service: "edge",
@@ -259,7 +351,7 @@ const DEFAULT_CONFIG: TTSConfig = {
     jobConcurrencyLimit: 1,
     sectionConcurrencyLimit: 1,
     outputFormat: "m4b",
-    cacheClearThresholdMB: 50,
+    cacheClearThresholdMB: DEFAULT_CACHE_THRESHOLD_MB,
     azureKey: "",
     azureRegion: "",
 };
@@ -270,6 +362,14 @@ function loadConfig(): void {
     try {
         if (fs.existsSync(configFilePath)) {
             ttsConfig = { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(configFilePath, "utf-8")) };
+            // The threshold used to measure only clearable output; it now covers
+            // the whole cache, including the audiobook library that History keeps
+            // permanently. Anyone still on the old 50MB default would be warned
+            // constantly, so move that one value (and only that one) forward.
+            if (ttsConfig.cacheClearThresholdMB === LEGACY_CACHE_THRESHOLD_MB) {
+                ttsConfig.cacheClearThresholdMB = DEFAULT_CACHE_THRESHOLD_MB;
+                saveConfig(ttsConfig);
+            }
         } else {
             saveConfig(DEFAULT_CONFIG);
         }
@@ -284,6 +384,8 @@ function saveConfig(config: TTSConfig): void {
 
 app.whenReady().then(() => {
     loadConfig();
+    loadJobs();
+    registerCacheProtocol();
     createMainWindow();
 });
 
@@ -291,6 +393,9 @@ app.on("window-all-closed", () => {
     win = null;
     if (process.platform !== "darwin") app.quit();
 });
+
+// The manifest writes are debounced; make sure the last one lands on quit.
+app.on("before-quit", () => flushJobs());
 
 app.on("second-instance", () => {
     if (win) {
@@ -321,21 +426,23 @@ ipcMain.handle("save-tts-config", (_event, newConfig: TTSConfig) => {
 ipcMain.handle("convert-files", handleFileConversion);
 ipcMain.handle("make-chapters", handleMakeChapters);
 ipcMain.handle("add-to-list", handleAddToList);
+ipcMain.handle("load-ebook", handleLoadEbook);
 ipcMain.handle("import-dropped-files", handleImportDroppedFiles);
 ipcMain.handle("read-file-content", handleReadFileContent);
 ipcMain.handle("write-file-content", handleWriteFileContent);
-ipcMain.handle("load-audio", handleAudioLoad);
 ipcMain.handle("download-file", handleFileDownload);
 ipcMain.handle("download-files", handleAllFilesDownload);
 ipcMain.handle("test-voices", () => testVoiceAvailability());
 ipcMain.handle("change-language", (_event, language: string) => changeLanguage(language));
-ipcMain.handle("clear-output-cache", () => clearFinishedOutputCache());
-ipcMain.handle("get-output-cache-info", () => getDirectoryInfo(CONTENT_CACHE_DIR));
-ipcMain.handle("open-output-cache-folder", () => {
+ipcMain.handle("list-jobs", () => getSnapshot());
+ipcMain.handle("free-jobs-cache", (_event, jobIds: string[]) => freeJobsCache(jobIds));
+ipcMain.handle("delete-jobs", (_event, jobIds: string[]) => deleteJobs(jobIds));
+ipcMain.handle("clear-orphan-cache", () => clearOrphanCache());
+ipcMain.handle("get-cache-info", () => getCacheInfo());
+ipcMain.handle("open-cache-folder", () => {
     createDirIfNeeded(CONTENT_CACHE_DIR);
     shell.openPath(CONTENT_CACHE_DIR);
 });
-ipcMain.handle("open-window", (_event, name: "chapter-maker" | "voice-tester") => {
-    if (name === "chapter-maker") createChapterMakerWindow();
-    else if (name === "voice-tester") createVoiceTesterWindow();
+ipcMain.handle("open-window", (_event, name: "voice-tester") => {
+    if (name === "voice-tester") createVoiceTesterWindow();
 });
